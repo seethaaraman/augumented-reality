@@ -1,3 +1,5 @@
+const GITHUB_MODELS_CDN = 'https://raw.githubusercontent.com/seethaaraman/augumented-reality/main/frontend/public/models';
+
 export const DISHES_DATA = [
   {
     id: 'chicken-biryani',
@@ -22,7 +24,7 @@ export const DISHES_DATA = [
     badge: 'CHEF RECOMMENDED',
     isARAvailable: true,
     modelUrl: '/models/biryani.glb',
-    remoteModelUrl: 'https://n.uguu.se/YtjbdxoD.glb',
+    remoteModelUrl: `${GITHUB_MODELS_CDN}/biryani.glb`,
     colorAccent: '#f59e0b'
   },
   {
@@ -48,7 +50,7 @@ export const DISHES_DATA = [
     badge: 'PASTRY SPECIAL',
     isARAvailable: true,
     modelUrl: '/models/cake.glb',
-    remoteModelUrl: 'https://n.uguu.se/ygKHqbFH.glb',
+    remoteModelUrl: `${GITHUB_MODELS_CDN}/cake.glb`,
     colorAccent: '#ec4899'
   },
   {
@@ -73,7 +75,7 @@ export const DISHES_DATA = [
     badge: 'HOUSE SIGNATURE',
     isARAvailable: true,
     modelUrl: '/models/butter-chicken.glb',
-    remoteModelUrl: 'https://h.uguu.se/ExGGLgLO.glb',
+    remoteModelUrl: `${GITHUB_MODELS_CDN}/butter-chicken.glb`,
     colorAccent: '#ef4444'
   },
   {
@@ -98,7 +100,7 @@ export const DISHES_DATA = [
     badge: 'POPULAR STARTER',
     isARAvailable: true,
     modelUrl: '/models/paneer-tikka.glb',
-    remoteModelUrl: 'https://n.uguu.se/qsEQdQhp.glb',
+    remoteModelUrl: `${GITHUB_MODELS_CDN}/paneer-tikka.glb`,
     colorAccent: '#10b981'
   },
   {
@@ -124,7 +126,7 @@ export const DISHES_DATA = [
     badge: 'CHILLED REFRESHER',
     isARAvailable: true,
     modelUrl: '/models/lime-soda.glb',
-    remoteModelUrl: 'https://d.uguu.se/OdPXzteX.glb',
+    remoteModelUrl: `${GITHUB_MODELS_CDN}/lime-soda.glb`,
     colorAccent: '#06b6d4'
   },
   {

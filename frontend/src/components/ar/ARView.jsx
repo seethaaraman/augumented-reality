@@ -6,38 +6,63 @@ import '@google/model-viewer';
  * ARView — Augmented Reality 3D Viewer Component
  * 
  * Supports:
- * - Google ARCore WebXR / SceneViewer (Android)
+ * - Google ARCore WebXR & Native SceneViewer (Android & Capacitor APK)
  * - Apple QuickLook (iOS)
  * - Interactive 3D manipulation (Single finger rotate, pinch to zoom)
  */
 export default function ARView({ dish, onBack, onOpenDetails }) {
   const modelViewerRef = useRef(null);
   const [arSupported, setArSupported] = useState(false);
-  const [instruction] = useState('✨ Drag to rotate • Pinch to zoom • Tap dish for details');
+  const [instruction] = useState('✨ Drag to rotate • Pinch to zoom • Tap camera for table AR');
+
+  // Resolves the best URL: prefers public HTTPS CDN so Google SceneViewer can download it
+  const activeModelUrl = dish.remoteModelUrl || (
+    dish.modelUrl?.startsWith('http')
+      ? dish.modelUrl
+      : `https://raw.githubusercontent.com/seethaaraman/augumented-reality/main/frontend/public/models/${dish.id === 'artisan-cake' ? 'cake' : dish.id}.glb`
+  );
 
   useEffect(() => {
     const checkAR = () => {
       if (modelViewerRef.current) {
-        setArSupported(modelViewerRef.current.canActivateAR);
+        setArSupported(Boolean(modelViewerRef.current.canActivateAR));
       }
     };
 
     const timer = setTimeout(checkAR, 600);
     return () => clearTimeout(timer);
-  }, []);
+  }, [dish]);
 
   const handleLaunchAR = () => {
-    if (modelViewerRef.current) {
-      if (modelViewerRef.current.canActivateAR) {
+    const dishTitle = encodeURIComponent(dish.name || 'Royal Dish');
+    const glbUrl = encodeURIComponent(activeModelUrl);
+
+    // 1. Try model-viewer's native WebXR activation first
+    if (modelViewerRef.current && modelViewerRef.current.canActivateAR) {
+      try {
         modelViewerRef.current.activateAR();
-      } else {
-        alert(
-          "To view in your real room with ARCore camera:\n\n" +
-          "1. Open this website on your Android or iPhone browser (Chrome / Safari).\n" +
-          "2. Tap 'Launch Real AR Camera' to place the Biryani on your real table!"
-        );
+        return;
+      } catch (err) {
+        console.warn('activateAR failed, using intent fallback', err);
       }
     }
+
+    // 2. Direct Android SceneViewer Intent (Works inside Android WebView / Capacitor / Chrome)
+    const isAndroid = /android/i.test(navigator.userAgent);
+    if (isAndroid) {
+      const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.0?file=${glbUrl}&mode=ar_only&resizable=true&title=${dishTitle}#Intent;scheme=https;action=android.intent.action.VIEW;end;`;
+      const sceneViewerHttps = `https://arvr.google.com/scene-viewer/1.0?file=${glbUrl}&mode=ar_only&resizable=true&title=${dishTitle}`;
+
+      try {
+        window.location.href = sceneViewerIntent;
+      } catch (e) {
+        window.location.href = sceneViewerHttps;
+      }
+      return;
+    }
+
+    // 3. iOS QuickLook / Direct Fallback
+    window.location.href = `https://arvr.google.com/scene-viewer/1.0?file=${glbUrl}&mode=ar_only&title=${dishTitle}`;
   };
 
   const handleResetCamera = () => {
@@ -65,10 +90,10 @@ export default function ARView({ dish, onBack, onOpenDetails }) {
       {/* 3D / AR Model Viewer */}
       <model-viewer
         ref={modelViewerRef}
-        src={dish.modelUrl || '/models/biryani.glb'}
+        src={activeModelUrl}
         alt={`3D Model of ${dish.name}`}
         ar
-        ar-modes="webxr scene-viewer quick-look"
+        ar-modes="scene-viewer webxr quick-look"
         ar-scale="auto"
         camera-controls
         touch-action="pan-y"
