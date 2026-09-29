@@ -25,6 +25,7 @@ export function getPublicModelUrl(dish) {
 
 /**
  * Launches the real Augmented Reality camera (Google ARCore / SceneViewer on Android, QuickLook on iOS).
+ * Configured with mode=ar_preferred & disable_occlusion=true to eliminate black screens and occlusion clipping.
  */
 export async function launchRealARCamera(dish) {
   if (!dish) return false;
@@ -69,7 +70,8 @@ export async function launchRealARCamera(dish) {
   const encodedTitle = encodeURIComponent(dishTitle);
 
   if (isAndroid) {
-    const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_only&resizable=true&title=${encodedTitle}#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;end;`;
+    // mode=ar_preferred & disable_occlusion=true prevents black camera feed and depth sensor occlusion
+    const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=${encodedTitle}#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;end;`;
     
     try {
       const link = document.createElement('a');
@@ -87,7 +89,7 @@ export async function launchRealARCamera(dish) {
   }
 
   // 4. Fallback: Direct https SceneViewer link (Chrome automatically launches ARCore SceneViewer)
-  const httpsUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_only&resizable=true&title=${encodedTitle}`;
+  const httpsUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=${encodedTitle}`;
   try {
     window.location.href = httpsUrl;
     return true;

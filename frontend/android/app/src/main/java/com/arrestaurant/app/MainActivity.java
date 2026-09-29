@@ -44,10 +44,10 @@ public class MainActivity extends BridgeActivity {
             String safeTitle = (title != null && !title.isEmpty()) ? title : "Royal Spice AR Dish";
             Log.d(TAG, "Launching SceneViewer for: " + glbUrl + " (" + safeTitle + ")");
 
-            // 1. Google App SceneViewer Intent (Primary method for Google ARCore / SceneViewer)
+            // 1. Google App SceneViewer Intent (mode=ar_preferred & disable_occlusion=true prevents black screen)
             String sceneViewerUri = "intent://arvr.google.com/scene-viewer/1.2?file=" +
                     Uri.encode(glbUrl) +
-                    "&mode=ar_only&resizable=true&title=" +
+                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=" +
                     Uri.encode(safeTitle) +
                     "#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;end;";
 
@@ -63,7 +63,7 @@ public class MainActivity extends BridgeActivity {
             // 2. Generic SceneViewer Intent (Resolves through Google Play Services for AR / ARCore)
             String genericUri = "intent://arvr.google.com/scene-viewer/1.2?file=" +
                     Uri.encode(glbUrl) +
-                    "&mode=ar_only&resizable=true&title=" +
+                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=" +
                     Uri.encode(safeTitle) +
                     "#Intent;scheme=https;action=android.intent.action.VIEW;end;";
 
@@ -79,7 +79,7 @@ public class MainActivity extends BridgeActivity {
             // 3. Fallback: Direct Intent to Google Chrome (Chrome launches SceneViewer directly)
             String httpsUri = "https://arvr.google.com/scene-viewer/1.2?file=" +
                     Uri.encode(glbUrl) +
-                    "&mode=ar_only&resizable=true&title=" +
+                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=" +
                     Uri.encode(safeTitle);
 
             Intent chromeIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));

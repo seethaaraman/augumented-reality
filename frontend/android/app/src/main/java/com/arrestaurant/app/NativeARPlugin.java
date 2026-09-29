@@ -3,7 +3,6 @@ package com.arrestaurant.app;
 import android.content.Intent;
 import android.net.Uri;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -25,89 +24,17 @@ public class NativeARPlugin extends Plugin {
             return;
         }
 
-        Log.d(TAG, "Capacitor Plugin launchAR called for: " + glbUrl);
-        boolean launched = openSceneViewer(glbUrl, title);
-        if (launched) {
-            JSObject ret = new JSObject();
-            ret.put("success", true);
-            call.resolve(ret);
-        } else {
-            call.reject("Could not open Google AR camera");
+        MainActivity activity = (MainActivity) getActivity();
+        if (activity != null) {
+            boolean success = activity.launchSceneViewer(glbUrl, title);
+            if (success) {
+                JSObject ret = new JSObject();
+                ret.put("success", true);
+                call.resolve(ret);
+                return;
+            }
         }
-    }
-
-    public boolean openSceneViewer(String glbUrl, String title) {
-        if (getContext() == null) {
-            Log.e(TAG, "Context is null, cannot launch AR");
-            return false;
-        }
-
-        try {
-            String safeTitle = (title != null && !title.isEmpty()) ? title : "Royal Spice Dish";
-
-            // 1. Google App SceneViewer Intent (Primary method for Google ARCore / SceneViewer)
-            String sceneViewerUri = "intent://arvr.google.com/scene-viewer/1.2?file=" +
-                    Uri.encode(glbUrl) +
-                    "&mode=ar_only&resizable=true&title=" +
-                    Uri.encode(safeTitle) +
-                    "#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;end;";
-
-            Intent quickSearchIntent = Intent.parseUri(sceneViewerUri, Intent.URI_INTENT_SCHEME);
-            quickSearchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-            if (quickSearchIntent.resolveActivity(getContext().getPackageManager()) != null) {
-                Log.d(TAG, "Launching SceneViewer via Google App");
-                getContext().startActivity(quickSearchIntent);
-                return true;
-            }
-
-            // 2. Generic SceneViewer Intent (Resolves through Google Play Services for AR / ARCore)
-            String genericUri = "intent://arvr.google.com/scene-viewer/1.2?file=" +
-                    Uri.encode(glbUrl) +
-                    "&mode=ar_only&resizable=true&title=" +
-                    Uri.encode(safeTitle) +
-                    "#Intent;scheme=https;action=android.intent.action.VIEW;end;";
-
-            Intent genericIntent = Intent.parseUri(genericUri, Intent.URI_INTENT_SCHEME);
-            genericIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-            if (genericIntent.resolveActivity(getContext().getPackageManager()) != null) {
-                Log.d(TAG, "Launching SceneViewer via Generic Intent resolution");
-                getContext().startActivity(genericIntent);
-                return true;
-            }
-
-            // 3. Fallback: Direct Intent to Google Chrome (Chrome launches SceneViewer directly)
-            String httpsUri = "https://arvr.google.com/scene-viewer/1.2?file=" +
-                    Uri.encode(glbUrl) +
-                    "&mode=ar_only&resizable=true&title=" +
-                    Uri.encode(safeTitle);
-
-            Intent chromeIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
-            chromeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            chromeIntent.setPackage("com.android.chrome");
-
-            if (chromeIntent.resolveActivity(getContext().getPackageManager()) != null) {
-                Log.d(TAG, "Launching SceneViewer via Chrome");
-                getContext().startActivity(chromeIntent);
-                return true;
-            }
-
-            // 4. Fallback: Any default browser
-            Intent defaultBrowserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
-            defaultBrowserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            getContext().startActivity(defaultBrowserIntent);
-            return true;
-
-        } catch (Exception e) {
-            Log.e(TAG, "Error launching SceneViewer: " + e.getMessage(), e);
-            if (getActivity() != null) {
-                getActivity().runOnUiThread(() ->
-                    Toast.makeText(getContext(), "AR launch notice: " + e.getMessage(), Toast.LENGTH_SHORT).show()
-                );
-            }
-            return false;
-        }
+        call.reject("Could not open Google AR camera");
     }
 
     @Override

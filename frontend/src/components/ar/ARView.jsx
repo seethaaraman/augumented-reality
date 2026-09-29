@@ -1,19 +1,21 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { ArrowLeft, RotateCcw, Camera, Info, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Camera, Info, Sparkles, Loader2, Utensils } from 'lucide-react';
 import '@google/model-viewer';
 import { launchRealARCamera, getPublicModelUrl } from '../../services/arLauncher';
 
 /**
  * ARView — Augmented Reality 3D Viewer Component
  * 
- * Supports:
- * - Direct Google ARCore / SceneViewer Camera Launch (Android Capacitor APK & Chrome)
- * - Apple QuickLook (iOS)
- * - Interactive 3D manipulation (Single finger rotate, pinch to zoom)
+ * Features:
+ * - Table-grounded 3D model rendering at authentic gastronomy scale
+ * - Google ARCore / SceneViewer integration (ar_preferred, anti-occlusion)
+ * - Custom glowing loading poster (eliminates blank black screens)
+ * - Studio environment lighting (environment-image="neutral")
  */
 export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false }) {
   const modelViewerRef = useRef(null);
   const [isLaunching, setIsLaunching] = useState(false);
+  const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [instruction, setInstruction] = useState('✨ Drag to rotate • Pinch to zoom • Tap camera for table AR');
 
   // Guaranteed public HTTPS model URL for Google SceneViewer
@@ -49,7 +51,7 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
 
   const handleResetCamera = () => {
     if (modelViewerRef.current) {
-      modelViewerRef.current.cameraOrbit = 'auto auto auto';
+      modelViewerRef.current.cameraOrbit = '0deg 70deg 105%';
       modelViewerRef.current.cameraTarget = 'auto auto auto';
     }
   };
@@ -77,17 +79,40 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
         ar
         ar-modes="scene-viewer webxr quick-look"
         ar-scale="auto"
+        ar-placement="floor"
         camera-controls
         touch-action="pan-y"
-        shadow-intensity="1.5"
-        shadow-softness="0.8"
-        exposure="1.0"
+        loading="eager"
+        reveal="auto"
+        camera-orbit="0deg 70deg 105%"
+        min-camera-orbit="auto auto 50%"
+        max-camera-orbit="auto auto 250%"
+        shadow-intensity="1.3"
+        shadow-softness="0.6"
+        exposure="1.05"
+        environment-image="neutral"
         bounds="tight"
         auto-rotate
-        auto-rotate-delay="2500"
-        rotation-per-second="20deg"
+        auto-rotate-delay="2000"
+        rotation-per-second="18deg"
         className="model-viewer-viewport"
+        onLoad={() => setIsModelLoaded(true)}
       >
+        {/* Custom Loading Poster Slot — Prevents Blank Black Screen */}
+        <div slot="poster" className="model-viewer-poster">
+          <div className="poster-loader-card">
+            <div className="poster-icon-pulse">
+              <Utensils size={32} style={{ color: 'var(--accent-gold)' }} />
+            </div>
+            <div className="poster-dish-title">{dish.name}</div>
+            <div className="poster-dish-subtitle">Preparing 3D Gastronomy Model...</div>
+            <div className="poster-spinner-wrap">
+              <Loader2 size={24} className="spin" style={{ color: 'var(--accent-gold)' }} />
+            </div>
+          </div>
+        </div>
+
+        {/* Hidden Model-Viewer AR Trigger */}
         <button
           slot="ar-button"
           style={{ display: 'none' }}
@@ -118,7 +143,7 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
           onClick={handleLaunchAR}
           disabled={isLaunching}
           style={{
-            opacity: isLaunching ? 0.8 : 1,
+            opacity: isLaunching ? 0.85 : 1,
             cursor: isLaunching ? 'wait' : 'pointer'
           }}
         >
