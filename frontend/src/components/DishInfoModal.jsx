@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, Flame, Check, ShoppingBag, Clock, Sparkles } from 'lucide-react';
+import { X, Flame, Check, ShoppingBag, Clock, Sparkles, Camera } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { placeOrder } from '../services/api';
+import { launchRealARCamera } from '../services/arLauncher';
 
 export default function DishInfoModal({ dish, onClose, onSelectAR }) {
   const [isOrdered, setIsOrdered] = useState(false);
@@ -23,59 +24,67 @@ export default function DishInfoModal({ dish, onClose, onSelectAR }) {
     setTimeout(() => {
       setIsOrdered(false);
       setOrderReceipt(null);
-    }, 3000);
+    }, 4000);
+  };
+
+  const handleLaunchAR = () => {
+    onClose();
+    launchRealARCamera(dish);
+    if (onSelectAR) {
+      onSelectAR(dish, true);
+    }
   };
 
   return (
-    <div className="dish-modal-backdrop" onClick={onClose}>
-      <div
-        className="dish-modal-card"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-drag-indicator" />
-
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
+        {/* Modal Header */}
         <div className="modal-header">
           <div>
+            <span style={{
+              fontSize: '0.72rem',
+              color: 'var(--accent-gold)',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em'
+            }}>
+              Authentic Recipe Details
+            </span>
             <h3 className="modal-title">{dish.name}</h3>
-            <p style={{ color: 'var(--accent-gold)', fontSize: '0.88rem', fontWeight: 600 }}>
-              {dish.tagline || 'Curated Signature Dish'}
-            </p>
           </div>
-          <button
-            className="modal-close-btn"
-            onClick={onClose}
-            aria-label="Close"
-          >
+          <button className="modal-close" onClick={onClose} aria-label="Close details">
             <X size={20} />
           </button>
         </div>
 
-        <div className="modal-price-row">
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-            <span className="meta-pill spice">
-              <Flame size={13} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-              {dish.spiceLevel}
+        {/* Spice, Rating & Prep Time */}
+        <div className="dish-meta-pills" style={{ marginBottom: '16px' }}>
+          <span className="meta-pill spice">
+            <Flame size={13} style={{ display: 'inline', marginRight: '4px' }} />
+            {dish.spiceLevel}
+          </span>
+          {dish.prepTime && (
+            <span className="meta-pill">
+              <Clock size={13} style={{ display: 'inline', marginRight: '4px' }} />
+              {dish.prepTime}
             </span>
-            {dish.prepTime && (
-              <span className="meta-pill">
-                <Clock size={13} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
-                {dish.prepTime}
-              </span>
-            )}
-          </div>
-          <div className="modal-price">
-            {dish.price}
-          </div>
+          )}
+          <span className="meta-pill">
+            ⭐ {dish.rating}
+          </span>
         </div>
 
-        <p className="modal-desc">
-          {dish.description}
-        </p>
+        {/* Culinary Description */}
+        <p className="modal-desc">{dish.description}</p>
 
-        <h4 className="modal-section-title">Ingredients & Recipe Profile</h4>
+        {/* Ingredients Checklist */}
+        <h4 className="ingredients-title">Key Ingredients & Heritage Spices</h4>
         <ul className="ingredients-list">
-          {dish.ingredients && dish.ingredients.map((ing, i) => (
-            <li key={i}>{ing}</li>
+          {dish.ingredients?.map((item, index) => (
+            <li key={index} className="ingredient-item">
+              <span className="ingredient-bullet" />
+              <span>{item}</span>
+            </li>
           ))}
         </ul>
 
@@ -85,12 +94,9 @@ export default function DishInfoModal({ dish, onClose, onSelectAR }) {
             <button
               className="btn-view-ar"
               style={{ fontSize: '0.95rem', padding: '14px 20px' }}
-              onClick={() => {
-                onClose();
-                onSelectAR(dish);
-              }}
+              onClick={handleLaunchAR}
             >
-              <Sparkles size={18} />
+              <Camera size={18} />
               ✨ VIEW IN AR ON YOUR TABLE
             </button>
           )}

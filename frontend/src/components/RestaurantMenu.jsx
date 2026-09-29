@@ -1,9 +1,22 @@
-import React from 'react';
-import { Sparkles, Flame, Clock, Award, Eye } from 'lucide-react';
+import React, { useState } from 'react';
+import { Sparkles, Flame, Clock, Award, Eye, Camera, Loader2 } from 'lucide-react';
+import { launchRealARCamera } from '../services/arLauncher';
 
 export default function RestaurantMenu({ dishes = [], onSelectAR, onSelectDish }) {
+  const [isLaunchingFeatured, setIsLaunchingFeatured] = useState(false);
   const biryani = dishes.find((d) => d.id === 'chicken-biryani') || dishes[0];
   const otherDishes = dishes.filter((d) => d.id !== 'chicken-biryani');
+
+  const handleLaunchFeaturedAR = async () => {
+    if (!biryani) return;
+    setIsLaunchingFeatured(true);
+    try {
+      launchRealARCamera(biryani);
+      onSelectAR(biryani, true);
+    } finally {
+      setTimeout(() => setIsLaunchingFeatured(false), 2000);
+    }
+  };
 
   return (
     <main className="menu-section">
@@ -49,19 +62,12 @@ export default function RestaurantMenu({ dishes = [], onSelectAR, onSelectDish }
                 {biryani.prepTime}
               </span>
             )}
-            {biryani.rating && (
-              <span className="meta-pill">
-                {biryani.rating}
-              </span>
-            )}
-            {biryani.calories && (
-              <span className="meta-pill">
-                {biryani.calories}
-              </span>
-            )}
+            <span className="meta-pill">
+              ⭐ {biryani.rating}
+            </span>
           </div>
 
-          <p className="dish-description-lg">
+          <p className="featured-description">
             {biryani.description}
           </p>
 
@@ -75,15 +81,50 @@ export default function RestaurantMenu({ dishes = [], onSelectAR, onSelectDish }
             </div>
           )}
 
-          {/* VIEW IN AR BUTTON */}
-          <button
-            id="btn-view-ar"
-            className="btn-view-ar"
-            onClick={() => onSelectAR(biryani)}
-          >
-            <Sparkles size={20} />
-            ✨ VIEW IN AR ON YOUR TABLE
-          </button>
+          {/* VIEW IN AR BUTTONS */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <button
+              id="btn-view-ar"
+              className="btn-view-ar"
+              onClick={handleLaunchFeaturedAR}
+              disabled={isLaunchingFeatured}
+            >
+              {isLaunchingFeatured ? (
+                <>
+                  <Loader2 size={20} className="spin" />
+                  LAUNCHING GOOGLE AR CAMERA...
+                </>
+              ) : (
+                <>
+                  <Camera size={20} />
+                  ✨ VIEW IN AR ON YOUR TABLE
+                </>
+              )}
+            </button>
+
+            <button
+              id="btn-view-3d"
+              onClick={() => onSelectAR(biryani, false)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '12px 18px',
+                background: 'rgba(255, 255, 255, 0.06)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: 'var(--radius-lg)',
+                color: '#e2e8f0',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <Eye size={16} />
+              Interactive 3D Canvas Preview
+            </button>
+          </div>
         </section>
       )}
 
@@ -137,17 +178,32 @@ export default function RestaurantMenu({ dishes = [], onSelectAR, onSelectDish }
               </div>
 
               {dish.isARAvailable && (
-                <button
-                  className="btn-card-ar"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectAR(dish);
-                  }}
-                  title="View 3D Model in Augmented Reality"
-                >
-                  <Sparkles size={14} />
-                  View 3D / AR
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="btn-card-ar"
+                    onClick={() => {
+                      launchRealARCamera(dish);
+                      onSelectAR(dish, true);
+                    }}
+                    title="Launch Google AR camera on table"
+                  >
+                    <Camera size={14} />
+                    Launch AR
+                  </button>
+                  <button
+                    className="btn-card-ar"
+                    style={{
+                      background: 'rgba(255, 255, 255, 0.06)',
+                      borderColor: 'rgba(255, 255, 255, 0.15)',
+                      color: '#cbd5e1'
+                    }}
+                    onClick={() => onSelectAR(dish, false)}
+                    title="Inspect 3D Model"
+                  >
+                    <Eye size={14} />
+                    3D
+                  </button>
+                </div>
               )}
             </div>
           </div>

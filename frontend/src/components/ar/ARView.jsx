@@ -1,69 +1,51 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { ArrowLeft, RotateCcw, Camera, Info, Sparkles } from 'lucide-react';
+import { ArrowLeft, RotateCcw, Camera, Info, Sparkles, Loader2 } from 'lucide-react';
 import '@google/model-viewer';
+import { launchRealARCamera, getPublicModelUrl } from '../../services/arLauncher';
 
 /**
  * ARView — Augmented Reality 3D Viewer Component
  * 
  * Supports:
- * - Google ARCore WebXR & Native SceneViewer (Android & Capacitor APK)
+ * - Direct Google ARCore / SceneViewer Camera Launch (Android Capacitor APK & Chrome)
  * - Apple QuickLook (iOS)
  * - Interactive 3D manipulation (Single finger rotate, pinch to zoom)
  */
-export default function ARView({ dish, onBack, onOpenDetails }) {
+export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false }) {
   const modelViewerRef = useRef(null);
-  const [arSupported, setArSupported] = useState(false);
-  const [instruction] = useState('✨ Drag to rotate • Pinch to zoom • Tap camera for table AR');
+  const [isLaunching, setIsLaunching] = useState(false);
+  const [instruction, setInstruction] = useState('✨ Drag to rotate • Pinch to zoom • Tap camera for table AR');
 
-  // Resolves the best URL: prefers public HTTPS CDN so Google SceneViewer can download it
-  const activeModelUrl = dish.remoteModelUrl || (
-    dish.modelUrl?.startsWith('http')
-      ? dish.modelUrl
-      : `https://raw.githubusercontent.com/seethaaraman/augumented-reality/main/frontend/public/models/${dish.id === 'artisan-cake' ? 'cake' : dish.id}.glb`
-  );
+  // Guaranteed public HTTPS model URL for Google SceneViewer
+  const activeModelUrl = getPublicModelUrl(dish);
+
+  const handleLaunchAR = async () => {
+    setIsLaunching(true);
+    setInstruction('🚀 Opening Google AR camera on your table...');
+
+    try {
+      const launched = await launchRealARCamera(dish);
+      if (!launched && modelViewerRef.current && modelViewerRef.current.canActivateAR) {
+        modelViewerRef.current.activateAR();
+      }
+    } catch (err) {
+      console.warn('[ARView] AR launch issue:', err);
+    } finally {
+      setTimeout(() => {
+        setIsLaunching(false);
+        setInstruction('✨ Drag to rotate • Pinch to zoom • Tap camera for table AR');
+      }, 3000);
+    }
+  };
 
   useEffect(() => {
-    const checkAR = () => {
-      if (modelViewerRef.current) {
-        setArSupported(Boolean(modelViewerRef.current.canActivateAR));
-      }
-    };
-
-    const timer = setTimeout(checkAR, 600);
-    return () => clearTimeout(timer);
-  }, [dish]);
-
-  const handleLaunchAR = () => {
-    const dishTitle = encodeURIComponent(dish.name || 'Royal Dish');
-    const glbUrl = encodeURIComponent(activeModelUrl);
-
-    // 1. Try model-viewer's native WebXR activation first
-    if (modelViewerRef.current && modelViewerRef.current.canActivateAR) {
-      try {
-        modelViewerRef.current.activateAR();
-        return;
-      } catch (err) {
-        console.warn('activateAR failed, using intent fallback', err);
-      }
+    if (autoLaunch) {
+      const timer = setTimeout(() => {
+        handleLaunchAR();
+      }, 500);
+      return () => clearTimeout(timer);
     }
-
-    // 2. Direct Android SceneViewer Intent (Works inside Android WebView / Capacitor / Chrome)
-    const isAndroid = /android/i.test(navigator.userAgent);
-    if (isAndroid) {
-      const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.0?file=${glbUrl}&mode=ar_only&resizable=true&title=${dishTitle}#Intent;scheme=https;action=android.intent.action.VIEW;end;`;
-      const sceneViewerHttps = `https://arvr.google.com/scene-viewer/1.0?file=${glbUrl}&mode=ar_only&resizable=true&title=${dishTitle}`;
-
-      try {
-        window.location.href = sceneViewerIntent;
-      } catch (e) {
-        window.location.href = sceneViewerHttps;
-      }
-      return;
-    }
-
-    // 3. iOS QuickLook / Direct Fallback
-    window.location.href = `https://arvr.google.com/scene-viewer/1.0?file=${glbUrl}&mode=ar_only&title=${dishTitle}`;
-  };
+  }, [autoLaunch]);
 
   const handleResetCamera = () => {
     if (modelViewerRef.current) {
@@ -105,16 +87,26 @@ export default function ARView({ dish, onBack, onOpenDetails }) {
         auto-rotate-delay="2500"
         rotation-per-second="20deg"
         className="model-viewer-viewport"
-        onClick={onOpenDetails}
       >
-        <button slot="ar-button" style={{ display: 'none' }}>
+        <button
+          slot="ar-button"
+          style={{ display: 'none' }}
+          onClick={(e) => {
+            e.preventDefault();
+            handleLaunchAR();
+          }}
+        >
           Activate AR
         </button>
       </model-viewer>
 
       {/* Floating Instruction Pill */}
       <div className="ar-instruction-pill">
-        <Sparkles size={16} style={{ color: 'var(--accent-gold)' }} />
+        {isLaunching ? (
+          <Loader2 size={16} className="spin" style={{ color: 'var(--accent-gold)' }} />
+        ) : (
+          <Sparkles size={16} style={{ color: 'var(--accent-gold)' }} />
+        )}
         <span>{instruction}</span>
       </div>
 
@@ -124,9 +116,23 @@ export default function ARView({ dish, onBack, onOpenDetails }) {
           id="btn-launch-camera"
           className="btn-launch-camera"
           onClick={handleLaunchAR}
+          disabled={isLaunching}
+          style={{
+            opacity: isLaunching ? 0.8 : 1,
+            cursor: isLaunching ? 'wait' : 'pointer'
+          }}
         >
-          <Camera size={20} />
-          Launch Real AR Camera
+          {isLaunching ? (
+            <>
+              <Loader2 size={20} className="spin" />
+              Opening AR Camera...
+            </>
+          ) : (
+            <>
+              <Camera size={20} />
+              Launch Real AR Camera
+            </>
+          )}
         </button>
 
         <button

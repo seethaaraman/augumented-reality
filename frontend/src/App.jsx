@@ -9,6 +9,7 @@ export default function App() {
   const [dishes, setDishes] = useState([]);
   const [currentView, setCurrentView] = useState('menu'); // 'menu' | 'ar'
   const [selectedDish, setSelectedDish] = useState(null);
+  const [autoLaunchCamera, setAutoLaunchCamera] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -25,8 +26,9 @@ export default function App() {
     loadDishes();
   }, []);
 
-  const handleSelectAR = (dish) => {
+  const handleSelectAR = (dish, triggerCamera = false) => {
     setSelectedDish(dish);
+    setAutoLaunchCamera(triggerCamera);
     setCurrentView('ar');
   };
 
@@ -37,6 +39,7 @@ export default function App() {
 
   const handleBackToMenu = () => {
     setCurrentView('menu');
+    setAutoLaunchCamera(false);
     setIsDetailsOpen(false);
   };
 
@@ -60,6 +63,7 @@ export default function App() {
       {currentView === 'ar' && selectedDish && (
         <ARView
           dish={selectedDish}
+          autoLaunch={autoLaunchCamera}
           onBack={handleBackToMenu}
           onOpenDetails={() => setIsDetailsOpen(true)}
         />
