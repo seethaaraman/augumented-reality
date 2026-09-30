@@ -78,7 +78,7 @@ export default function RestaurantMenu({ dishes = [], onSelectAR, onSelectDish }
           )}
 
           {/* VIEW IN AR BUTTONS */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div className="featured-actions-stack">
             <button
               id="btn-view-ar"
               className="btn-view-ar"
@@ -87,38 +87,25 @@ export default function RestaurantMenu({ dishes = [], onSelectAR, onSelectDish }
             >
               {isLaunchingFeatured ? (
                 <>
-                  <Loader2 size={20} className="spin" />
-                  LAUNCHING GOOGLE AR CAMERA...
+                  <Loader2 size={18} className="spin" />
+                  <span>OPENING AR CAMERA...</span>
                 </>
               ) : (
                 <>
-                  <Camera size={20} />
-                  ✨ VIEW IN AR ON YOUR TABLE
+                  <Camera size={18} />
+                  <span>✨ VIEW IN AR ON YOUR TABLE</span>
                 </>
               )}
             </button>
 
             <button
               id="btn-view-3d"
+              type="button"
+              className="btn-featured-3d"
               onClick={() => onSelectAR(biryani, false)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                padding: '12px 18px',
-                background: 'rgba(255, 255, 255, 0.06)',
-                border: '1px solid rgba(255, 255, 255, 0.15)',
-                borderRadius: 'var(--radius-lg)',
-                color: '#e2e8f0',
-                fontSize: '0.88rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
-              }}
             >
               <Eye size={16} />
-              Interactive 3D Canvas Preview
+              <span>Interactive 3D Canvas Preview</span>
             </button>
           </div>
         </section>
@@ -168,13 +155,13 @@ export default function RestaurantMenu({ dishes = [], onSelectAR, onSelectDish }
             </div>
 
             <div className="card-bottom">
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{dish.spiceLevel}</span>
-                <span style={{ fontSize: '0.8rem', color: '#cbd5e1' }}>{dish.rating}</span>
+              <div className="card-meta-row">
+                <span className="card-meta-pill">{dish.spiceLevel}</span>
+                <span className="card-meta-pill">⭐ {dish.rating}</span>
               </div>
 
               {dish.isARAvailable && (
-                <div style={{ display: 'flex', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="card-actions-row" onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
                     className="btn-card-ar"
@@ -185,7 +172,7 @@ export default function RestaurantMenu({ dishes = [], onSelectAR, onSelectDish }
                     title="Launch AR camera on table"
                   >
                     <Camera size={15} />
-                    Launch AR
+                    <span>Launch AR</span>
                   </button>
                   <button
                     type="button"
@@ -197,7 +184,7 @@ export default function RestaurantMenu({ dishes = [], onSelectAR, onSelectDish }
                     title="Inspect 3D Model"
                   >
                     <Eye size={15} />
-                    3D
+                    <span>3D</span>
                   </button>
                 </div>
               )}

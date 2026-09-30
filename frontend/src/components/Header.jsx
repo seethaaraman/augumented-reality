@@ -3,8 +3,8 @@ import { Sparkles, Camera } from 'lucide-react';
 
 export default function Header({ onOpenScanModal }) {
   return (
-    <header className="restaurant-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '14px' }}>
-      <div>
+    <header className="restaurant-header">
+      <div className="header-brand-wrap">
         <div className="brand-badge">
           <Sparkles size={12} />
           Royal Gastronomy
@@ -21,9 +21,10 @@ export default function Header({ onOpenScanModal }) {
             console.log('[Header] Opening 3D Scan modal');
             onOpenScanModal();
           }}
+          title="Scan food or upload 3D model"
         >
           <Camera size={16} />
-          Scan & Add 3D Dish
+          <span>Scan 3D Dish</span>
         </button>
       )}
     </header>

@@ -7,12 +7,14 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
+import android.webkit.PermissionRequest;
 import android.widget.Toast;
 
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebChromeClient;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivityAR";
@@ -23,14 +25,22 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NativeARPlugin.class);
         super.onCreate(savedInstanceState);
 
-        // Pre-request camera permission so ARCore camera session starts with zero delay and no black screen
+        // Pre-request camera permission so ARCore and HTML5 camera start instantly
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
         }
 
-        // Register direct JavaScript interface on WebView for instant zero-latency AR launch
+        // Register direct JavaScript interface and enable live camera WebRTC in WebView
         if (getBridge() != null && getBridge().getWebView() != null) {
             getBridge().getWebView().addJavascriptInterface(new ARJavaScriptBridge(), "AndroidAR");
+            getBridge().getWebView().setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
+                @Override
+                public void onPermissionRequest(final PermissionRequest request) {
+                    runOnUiThread(() -> {
+                        request.grant(request.getResources());
+                    });
+                }
+            });
         }
     }
 

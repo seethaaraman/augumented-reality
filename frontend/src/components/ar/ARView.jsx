@@ -68,10 +68,15 @@ function getDishLayers(dish) {
  */
 export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false }) {
   const modelViewerRef = useRef(null);
+  const videoRef = useRef(null);
   const hasAutoLaunchedRef = useRef(false);
-  const [isLaunching, setIsLaunching] = useState(false);
+
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraLoading, setCameraLoading] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const [isLaunchingNativeAR, setIsLaunchingNativeAR] = useState(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
-  const [instruction, setInstruction] = useState('✨ Drag to rotate • Pinch to zoom • Tap camera for table AR');
+  const [snapshotTaken, setSnapshotTaken] = useState(false);
 
   // Surface detection mode ('floor' = table/ground, 'wall' = vertical wall/board)
   const [placementMode, setPlacementMode] = useState('floor');
@@ -80,73 +85,120 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
   const [isLayerMode, setIsLayerMode] = useState(false);
   const [activeLayerIndex, setActiveLayerIndex] = useState(null);
 
+  const [instruction, setInstruction] = useState('🪑 Ground Mount Active: Point camera at dining table or floor');
+
   const layers = getDishLayers(dish);
   const activeModelUrl = getPublicModelUrl(dish);
 
-  const handleLaunchAR = async () => {
-    setIsLaunching(true);
-    setInstruction(`🚀 Launching AR Camera (${placementMode === 'wall' ? '🧱 Wall Mount' : '🪑 Ground Mount'})...`);
-
+  // Start in-app real camera stream
+  const startCamera = async () => {
     try {
-      // 1. If WebXR is available on model-viewer, activate WebXR in-camera view with HUD overlay
-      if (modelViewerRef.current && modelViewerRef.current.canActivateAR) {
-        console.log('[ARView] Activating WebXR in-camera AR session');
-        modelViewerRef.current.activateAR();
-        return;
+      setCameraLoading(true);
+      setCameraError(null);
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera access not supported on this device browser.');
       }
 
-      // 2. Otherwise launch real native AR (SceneViewer / QuickLook)
-      console.log('[ARView] WebXR not directly available, launching Native SceneViewer with mode:', placementMode);
-      await launchRealARCamera(dish, placementMode);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      });
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setIsCameraActive(true);
+      setInstruction(
+        placementMode === 'wall'
+          ? '🧱 Wall Mount: Point camera at vertical wall or menu board'
+          : '🪑 Ground Mount: Point camera at dining table or floor'
+      );
     } catch (err) {
-      console.warn('[ARView] AR launch issue:', err);
+      console.warn('[ARView] Live camera error:', err);
+      setCameraError(err.message || 'Camera permission denied or camera in use');
+      setIsCameraActive(false);
+      setInstruction('✨ 3D Studio Mode: Drag to rotate • Pinch to zoom • Tap Surface to switch mounts');
     } finally {
-      setTimeout(() => {
-        setIsLaunching(false);
-        setInstruction(isLayerMode ? '✨ Tap 3D layer hotspots to deconstruct ingredients' : '✨ Drag to rotate • Pinch to zoom • Tap camera for table AR');
-      }, 2500);
+      setCameraLoading(false);
     }
+  };
+
+  // Stop camera tracks on unmount or mode switch
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const tracks = videoRef.current.srcObject.getTracks();
+      tracks.forEach((track) => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
   };
 
   useEffect(() => {
-    if (autoLaunch && !hasAutoLaunchedRef.current) {
-      hasAutoLaunchedRef.current = true;
-      const timer = setTimeout(() => {
-        handleLaunchAR();
-      }, 350);
-      return () => clearTimeout(timer);
-    }
-  }, [autoLaunch]);
+    // Automatically start live camera feed when entering AR mode
+    startCamera();
 
-  const handleResetCamera = () => {
-    if (modelViewerRef.current) {
-      modelViewerRef.current.cameraOrbit = '0deg 70deg 105%';
-      modelViewerRef.current.cameraTarget = 'auto auto auto';
-      modelViewerRef.current.fieldOfView = 'auto';
-    }
-    setActiveLayerIndex(null);
-    setInstruction('🔄 View & Camera Reset');
-  };
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   const handleTogglePlacement = (forcedMode) => {
     const nextMode = forcedMode || (placementMode === 'floor' ? 'wall' : 'floor');
     setPlacementMode(nextMode);
-    setInstruction(nextMode === 'wall' ? '🧱 Wall Mount: Point camera at vertical wall or menu board' : '🪑 Ground Mount: Point camera at dining table or floor');
+
+    if (nextMode === 'wall') {
+      setInstruction('🧱 Wall Mount Active: Dish oriented flush against wall');
+      if (modelViewerRef.current) {
+        modelViewerRef.current.cameraOrbit = '0deg 90deg 100%';
+        modelViewerRef.current.cameraTarget = '0 0.05m 0';
+      }
+    } else {
+      setInstruction('🪑 Ground Mount Active: Dish positioned horizontally on table');
+      if (modelViewerRef.current) {
+        modelViewerRef.current.cameraOrbit = '0deg 70deg 105%';
+        modelViewerRef.current.cameraTarget = 'auto auto auto';
+      }
+    }
+  };
+
+  const handleResetCamera = () => {
+    if (modelViewerRef.current) {
+      if (placementMode === 'wall') {
+        modelViewerRef.current.cameraOrbit = '0deg 90deg 100%';
+        modelViewerRef.current.cameraTarget = '0 0.05m 0';
+      } else {
+        modelViewerRef.current.cameraOrbit = '0deg 70deg 105%';
+        modelViewerRef.current.cameraTarget = 'auto auto auto';
+      }
+      modelViewerRef.current.fieldOfView = 'auto';
+    }
+    setActiveLayerIndex(null);
+    setInstruction('🔄 Alignment and view reset successfully');
   };
 
   const handleToggleLayerMode = () => {
     const nextState = !isLayerMode;
     setIsLayerMode(nextState);
     if (nextState) {
-      setActiveLayerIndex(1); // default to mid layer
-      setInstruction('✨ 3D Layer Mode: Tap glowing hotspots to inspect ingredients');
+      setActiveLayerIndex(1);
+      setInstruction('✨ 3D Layers Exploded: Tap glowing hotspots on dish');
       if (modelViewerRef.current) {
         modelViewerRef.current.cameraOrbit = '30deg 65deg 90%';
       }
     } else {
       setActiveLayerIndex(null);
       handleResetCamera();
-      setInstruction('✨ Drag to rotate • Pinch to zoom • Tap camera for table AR');
+      setInstruction(
+        placementMode === 'wall'
+          ? '🧱 Wall Mount: Point camera at wall or menu board'
+          : '🪑 Ground Mount: Point camera at dining table or floor'
+      );
     }
   };
 
@@ -159,9 +211,118 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
     }
   };
 
+  // Launch Google SceneViewer if user explicitly desires external native plane tracking
+  const handleLaunchExternalGoogleAR = async () => {
+    setIsLaunchingNativeAR(true);
+    try {
+      await launchRealARCamera(dish, placementMode);
+    } catch (err) {
+      console.warn('[ARView] SceneViewer launch:', err);
+    } finally {
+      setTimeout(() => setIsLaunchingNativeAR(false), 2000);
+    }
+  };
+
+  const handleCapturePhoto = () => {
+    setSnapshotTaken(true);
+    setTimeout(() => setSnapshotTaken(false), 1200);
+  };
+
+  const handleClose = () => {
+    stopCamera();
+    onBack();
+  };
+
   return (
-    <div className={`ar-screen-container ${isLayerMode ? 'layer-mode-active' : ''}`}>
-      {/* 3D / AR Model Viewer */}
+    <div className={`ar-screen-container ${isLayerMode ? 'layer-mode-active' : ''} ${isCameraActive ? 'camera-view-active' : ''}`}>
+      {/* 1. Live Camera Feed Layer (Underneath 3D Model) */}
+      <video
+        ref={videoRef}
+        autoPlay
+        playsInline
+        muted
+        className={`ar-live-video-stream ${isCameraActive ? 'visible' : 'hidden'}`}
+      />
+
+      {/* Snapshot flash effect */}
+      {snapshotTaken && <div className="ar-snapshot-flash" />}
+
+      {/* 2. Visual Alignment Reticle in Live Camera */}
+      {isCameraActive && (
+        <div className={`ar-surface-reticle ${placementMode === 'wall' ? 'reticle-wall' : 'reticle-ground'}`}>
+          <div className="reticle-pulse-ring" />
+          <div className="reticle-crosshair-center" />
+          <div className="reticle-label">
+            {placementMode === 'wall' ? '🧱 WALL MOUNT SURFACE' : '🪑 DINING TABLE SURFACE'}
+          </div>
+        </div>
+      )}
+
+      {/* 3. IN-CAMERA TOP FLOATING HUD BAR (Always on top of camera) */}
+      <div className="in-camera-live-hud">
+        <div className="in-camera-top-bar">
+          {/* Left Controls: Menu & Reset */}
+          <div className="camera-hud-group">
+            <button
+              type="button"
+              className="camera-hud-btn"
+              onClick={handleClose}
+              title="Return to Restaurant Menu"
+            >
+              <ArrowLeft size={16} />
+              <span>Menu</span>
+            </button>
+
+            <button
+              type="button"
+              className="camera-hud-btn reset-btn"
+              onClick={handleResetCamera}
+              title="Reset Alignment & Orientation"
+            >
+              <RotateCcw size={15} />
+              <span>Reset</span>
+            </button>
+          </div>
+
+          {/* Right Controls: Ground Mount, Wall Mount, Explode Layers */}
+          <div className="camera-hud-group">
+            {/* Ground Mount */}
+            <button
+              type="button"
+              className={`camera-hud-btn ${placementMode === 'floor' ? 'active-mode' : ''}`}
+              onClick={() => handleTogglePlacement('floor')}
+              title="Mount 3D Dish on Dining Table or Ground"
+            >
+              <Grid size={15} />
+              <span>🪑 Ground</span>
+            </button>
+
+            {/* Wall Mount */}
+            <button
+              type="button"
+              className={`camera-hud-btn ${placementMode === 'wall' ? 'active-mode' : ''}`}
+              onClick={() => handleTogglePlacement('wall')}
+              title="Mount 3D Dish on Vertical Wall or Menu Board"
+            >
+              <Square size={15} />
+              <span>🧱 Wall</span>
+            </button>
+
+            {/* Explode Layers */}
+            <button
+              type="button"
+              className={`camera-hud-btn ${isLayerMode ? 'active-layer-btn' : ''}`}
+              onClick={handleToggleLayerMode}
+              title="Deconstruct into 3D ingredient layers"
+            >
+              <Layers size={15} />
+              <span>{isLayerMode ? 'Collapse' : '✨ Explode'}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. 3D Augmented Reality Model (Transparent canvas over live camera) */}
       <model-viewer
         ref={modelViewerRef}
         src={activeModelUrl}
@@ -174,98 +335,20 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
         touch-action="pan-y"
         loading="eager"
         reveal="auto"
-        camera-orbit="0deg 70deg 105%"
+        camera-orbit={placementMode === 'wall' ? '0deg 90deg 100%' : '0deg 70deg 105%'}
         min-camera-orbit="auto auto 40%"
         max-camera-orbit="auto auto 300%"
-        shadow-intensity="1.3"
-        shadow-softness="0.6"
-        exposure="1.05"
+        shadow-intensity={isCameraActive ? '1.8' : '1.3'}
+        shadow-softness="0.5"
+        exposure="1.08"
         environment-image="neutral"
         bounds="tight"
-        auto-rotate={!isLayerMode}
+        auto-rotate={!isLayerMode && !isCameraActive}
         auto-rotate-delay="3000"
         rotation-per-second="14deg"
-        className={`model-viewer-viewport ${isLayerMode ? 'exploded-visual' : ''}`}
+        className={`model-viewer-viewport ${isLayerMode ? 'exploded-visual' : ''} ${isCameraActive ? 'transparent-ar' : ''}`}
         onLoad={() => setIsModelLoaded(true)}
       >
-        {/* IN-CAMERA LIVE HUD (WebXR DOM Overlay & 3D Canvas Top Bar) */}
-        <div className="in-camera-live-hud" slot="ar-overlay">
-          <div className="in-camera-top-bar">
-            {/* Left Controls: Menu & Reset */}
-            <div className="camera-hud-group">
-              <button
-                type="button"
-                className="camera-hud-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onBack();
-                }}
-              >
-                <ArrowLeft size={16} />
-                <span>Menu</span>
-              </button>
-
-              <button
-                type="button"
-                className="camera-hud-btn reset-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleResetCamera();
-                }}
-                title="Reset Camera Orientation & Alignment"
-              >
-                <RotateCcw size={15} />
-                <span>Reset</span>
-              </button>
-            </div>
-
-            {/* Right Controls: Ground Mount, Wall Mount, Explode Layers */}
-            <div className="camera-hud-group">
-              {/* Ground Mount */}
-              <button
-                type="button"
-                className={`camera-hud-btn ${placementMode === 'floor' ? 'active-mode' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleTogglePlacement('floor');
-                }}
-                title="Mount 3D Dish on Dining Table or Ground"
-              >
-                <Grid size={15} />
-                <span>🪑 Ground</span>
-              </button>
-
-              {/* Wall Mount */}
-              <button
-                type="button"
-                className={`camera-hud-btn ${placementMode === 'wall' ? 'active-mode' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleTogglePlacement('wall');
-                }}
-                title="Mount 3D Dish on Vertical Wall or Menu Board"
-              >
-                <Square size={15} />
-                <span>🧱 Wall</span>
-              </button>
-
-              {/* Explode Layers */}
-              <button
-                type="button"
-                className={`camera-hud-btn ${isLayerMode ? 'active-layer-btn' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleToggleLayerMode();
-                }}
-                title="Deconstruct into 3D ingredient layers"
-              >
-                <Layers size={15} />
-                <span>{isLayerMode ? 'Collapse' : '✨ Explode'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
         {/* Custom Loading Poster Slot */}
         <div slot="poster" className="model-viewer-poster">
           <div className="poster-loader-card">
@@ -304,24 +387,11 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
             </div>
           </button>
         ))}
-
-        {/* Hidden Model-Viewer AR Trigger */}
-        <button
-          slot="ar-button"
-          type="button"
-          style={{ display: 'none' }}
-          onClick={(e) => {
-            e.preventDefault();
-            handleLaunchAR();
-          }}
-        >
-          Activate AR
-        </button>
       </model-viewer>
 
-      {/* Floating Instruction Pill */}
+      {/* Floating Status & Instruction Pill */}
       <div className="ar-instruction-pill">
-        {isLaunching ? (
+        {cameraLoading ? (
           <Loader2 size={16} className="spin" style={{ color: 'var(--accent-gold)' }} />
         ) : (
           <Sparkles size={16} style={{ color: 'var(--accent-gold)' }} />
@@ -385,36 +455,52 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
       {/* Bottom AR Controls */}
       {!isLayerMode && (
         <div className="ar-bottom-controls">
+          {/* Camera toggle: Live camera vs 3D Studio */}
           <button
-            id="btn-launch-camera"
-            className="btn-launch-camera"
-            onClick={handleLaunchAR}
-            disabled={isLaunching}
-            style={{
-              opacity: isLaunching ? 0.85 : 1,
-              cursor: isLaunching ? 'wait' : 'pointer'
-            }}
+            type="button"
+            className="btn-camera-toggle"
+            onClick={isCameraActive ? stopCamera : startCamera}
+            title="Toggle Live Camera View"
           >
-            {isLaunching ? (
-              <>
-                <Loader2 size={20} className="spin" />
-                Opening AR Camera...
-              </>
+            <Camera size={18} />
+            <span>{isCameraActive ? '3D Studio' : 'Live Camera'}</span>
+          </button>
+
+          {/* Snap Photo button */}
+          {isCameraActive && (
+            <button
+              type="button"
+              className="btn-snap-photo"
+              onClick={handleCapturePhoto}
+              title="Capture photo of AR dish"
+            >
+              <span>📸 Snap Photo</span>
+            </button>
+          )}
+
+          {/* Optional Launch Google SceneViewer button */}
+          <button
+            type="button"
+            className="btn-sceneviewer-trigger"
+            onClick={handleLaunchExternalGoogleAR}
+            disabled={isLaunchingNativeAR}
+            title="Open in native Google Play Services AR"
+          >
+            {isLaunchingNativeAR ? (
+              <Loader2 size={16} className="spin" />
             ) : (
-              <>
-                <Camera size={20} />
-                Launch Real AR Camera
-              </>
+              <span>Google ARCore</span>
             )}
           </button>
 
           <button
+            type="button"
             id="btn-dish-details"
             className="btn-dish-details"
             onClick={onOpenDetails}
           >
             <Info size={18} />
-            Details
+            <span>Details</span>
           </button>
         </div>
       )}
