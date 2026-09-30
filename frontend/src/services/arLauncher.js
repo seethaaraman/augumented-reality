@@ -86,15 +86,21 @@ export async function launchRealARCamera(dish) {
     } catch (e) {
       console.warn('[ARLauncher] Intent click failed, falling back to HTTPS', e);
     }
+
+    // Android Chrome fallback: Direct https SceneViewer link
+    const httpsUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=${encodedTitle}`;
+    try {
+      window.location.href = httpsUrl;
+      return true;
+    } catch (err) {
+      console.error('[ARLauncher] Fallback navigation error:', err);
+      return false;
+    }
   }
 
-  // 4. Fallback: Direct https SceneViewer link (Chrome automatically launches ARCore SceneViewer)
-  const httpsUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=${encodedTitle}`;
-  try {
-    window.location.href = httpsUrl;
-    return true;
-  } catch (err) {
-    console.error('[ARLauncher] Fallback navigation error:', err);
-    return false;
-  }
+  // 4. Desktop PC / Mac fallback:
+  // Google SceneViewer (arvr.google.com) is Android-only and returns "Error: Not Found" on desktop browsers.
+  // On desktop, we stay in-app and launch the 3D Canvas viewer instead.
+  console.log('[ARLauncher] Desktop browser detected. Using in-app 3D canvas viewer.');
+  return false;
 }

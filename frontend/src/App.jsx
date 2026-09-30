@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Header from './components/Header';
 import RestaurantMenu from './components/RestaurantMenu';
 import DishInfoModal from './components/DishInfoModal';
+import DishScanModal from './components/DishScanModal';
 import ARView from './components/ar/ARView';
 import { fetchMenu } from './services/api';
 
@@ -11,6 +12,7 @@ export default function App() {
   const [selectedDish, setSelectedDish] = useState(null);
   const [autoLaunchCamera, setAutoLaunchCamera] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,6 +45,11 @@ export default function App() {
     setIsDetailsOpen(false);
   };
 
+  const handleDishAdded = (newDish) => {
+    setDishes((prev) => [newDish, ...prev]);
+    setSelectedDish(newDish);
+  };
+
   return (
     <div className="app-container">
       {/* Ambient background glows */}
@@ -51,7 +58,7 @@ export default function App() {
 
       {currentView === 'menu' && (
         <>
-          <Header />
+          <Header onOpenScanModal={() => setIsScanModalOpen(true)} />
           <RestaurantMenu
             dishes={dishes}
             onSelectAR={handleSelectAR}
@@ -77,6 +84,13 @@ export default function App() {
           onSelectAR={handleSelectAR}
         />
       )}
+
+      {/* 3D Scan & Cloudinary Add Dish Modal */}
+      <DishScanModal
+        isOpen={isScanModalOpen}
+        onClose={() => setIsScanModalOpen(false)}
+        onDishAdded={handleDishAdded}
+      />
     </div>
   );
 }

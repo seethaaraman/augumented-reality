@@ -45,3 +45,8 @@ Thumbs.db
 *.suo
 *.user
 *.userprefs
+
+# Environment files
+.env
+.env.*
+*.env

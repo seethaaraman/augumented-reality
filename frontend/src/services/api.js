@@ -1,6 +1,15 @@
+import { Capacitor } from '@capacitor/core';
 import { DISHES_DATA } from '../../../backend/src/data/dishesData.js';
 
-const API_BASE = '/api';
+export function getApiBase() {
+  if (Capacitor.isNativePlatform()) {
+    // When running inside the Android APK on a device
+    return import.meta.env.VITE_BACKEND_URL || 'http://10.90.120.213:5000/api';
+  }
+  return '/api';
+}
+
+export const API_BASE = getApiBase();
 
 /**
  * Fetches the restaurant menu from the backend API.
@@ -8,7 +17,7 @@ const API_BASE = '/api';
  */
 export async function fetchMenu() {
   try {
-    const res = await fetch(`${API_BASE}/menu`, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`${getApiBase()}/menu`, { signal: AbortSignal.timeout(3000) });
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.data) {
