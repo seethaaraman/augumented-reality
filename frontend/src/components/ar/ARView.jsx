@@ -68,6 +68,7 @@ function getDishLayers(dish) {
  */
 export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false }) {
   const modelViewerRef = useRef(null);
+  const hasAutoLaunchedRef = useRef(false);
   const [isLaunching, setIsLaunching] = useState(false);
   const [isModelLoaded, setIsModelLoaded] = useState(false);
   const [instruction, setInstruction] = useState('✨ Drag to rotate • Pinch to zoom • Tap camera for table AR');
@@ -84,28 +85,35 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
 
   const handleLaunchAR = async () => {
     setIsLaunching(true);
-    setInstruction('🚀 Opening Google AR camera (detects tables, ground & walls)...');
+    setInstruction(`🚀 Launching AR Camera (${placementMode === 'wall' ? '🧱 Wall Mount' : '🪑 Ground Mount'})...`);
 
     try {
-      const launched = await launchRealARCamera(dish);
-      if (!launched && modelViewerRef.current && modelViewerRef.current.canActivateAR) {
+      // 1. If WebXR is available on model-viewer, activate WebXR in-camera view with HUD overlay
+      if (modelViewerRef.current && modelViewerRef.current.canActivateAR) {
+        console.log('[ARView] Activating WebXR in-camera AR session');
         modelViewerRef.current.activateAR();
+        return;
       }
+
+      // 2. Otherwise launch real native AR (SceneViewer / QuickLook)
+      console.log('[ARView] WebXR not directly available, launching Native SceneViewer with mode:', placementMode);
+      await launchRealARCamera(dish, placementMode);
     } catch (err) {
       console.warn('[ARView] AR launch issue:', err);
     } finally {
       setTimeout(() => {
         setIsLaunching(false);
         setInstruction(isLayerMode ? '✨ Tap 3D layer hotspots to deconstruct ingredients' : '✨ Drag to rotate • Pinch to zoom • Tap camera for table AR');
-      }, 3000);
+      }, 2500);
     }
   };
 
   useEffect(() => {
-    if (autoLaunch) {
+    if (autoLaunch && !hasAutoLaunchedRef.current) {
+      hasAutoLaunchedRef.current = true;
       const timer = setTimeout(() => {
         handleLaunchAR();
-      }, 500);
+      }, 350);
       return () => clearTimeout(timer);
     }
   }, [autoLaunch]);
@@ -114,14 +122,16 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
     if (modelViewerRef.current) {
       modelViewerRef.current.cameraOrbit = '0deg 70deg 105%';
       modelViewerRef.current.cameraTarget = 'auto auto auto';
+      modelViewerRef.current.fieldOfView = 'auto';
     }
     setActiveLayerIndex(null);
+    setInstruction('🔄 View & Camera Reset');
   };
 
-  const handleTogglePlacement = () => {
-    const nextMode = placementMode === 'floor' ? 'wall' : 'floor';
+  const handleTogglePlacement = (forcedMode) => {
+    const nextMode = forcedMode || (placementMode === 'floor' ? 'wall' : 'floor');
     setPlacementMode(nextMode);
-    setInstruction(nextMode === 'wall' ? '🧱 Wall Mode: Aim camera at vertical walls or menus' : '🪑 Surface Mode: Aim camera at dining tables or floor');
+    setInstruction(nextMode === 'wall' ? '🧱 Wall Mount: Point camera at vertical wall or menu board' : '🪑 Ground Mount: Point camera at dining table or floor');
   };
 
   const handleToggleLayerMode = () => {
@@ -151,60 +161,13 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
 
   return (
     <div className={`ar-screen-container ${isLayerMode ? 'layer-mode-active' : ''}`}>
-      {/* Top Navigation HUD */}
-      <div className="ar-top-hud">
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button className="hud-btn" onClick={onBack}>
-            <ArrowLeft size={18} />
-            Menu
-          </button>
-
-          <button className="hud-btn" onClick={handleResetCamera} title="Reset 3D Camera">
-            <RotateCcw size={16} />
-            Reset
-          </button>
-        </div>
-
-        {/* Right HUD Controls: Surface Mode & Deconstruct Layers */}
-        <div style={{ display: 'flex', gap: '8px' }}>
-          {/* Surface Mode Toggle (Table/Floor vs. Vertical Wall) */}
-          <button
-            className={`hud-btn ${placementMode === 'wall' ? 'active-surface-btn' : ''}`}
-            onClick={handleTogglePlacement}
-            title="Toggle surface: Table/Floor vs Vertical Wall"
-          >
-            {placementMode === 'wall' ? (
-              <>
-                <Square size={15} style={{ color: 'var(--accent-gold)' }} />
-                🧱 Wall Mode
-              </>
-            ) : (
-              <>
-                <Grid size={15} />
-                🪑 Surface Mode
-              </>
-            )}
-          </button>
-
-          {/* Interactive Deconstruct Layers Button */}
-          <button
-            className={`hud-btn ${isLayerMode ? 'active-layer-btn' : ''}`}
-            onClick={handleToggleLayerMode}
-            title="Deconstruct into 3D ingredient layers"
-          >
-            <Layers size={16} style={{ color: isLayerMode ? 'var(--accent-gold)' : '#fff' }} />
-            {isLayerMode ? 'Collapse Dish' : '✨ Explode Layers'}
-          </button>
-        </div>
-      </div>
-
       {/* 3D / AR Model Viewer */}
       <model-viewer
         ref={modelViewerRef}
         src={activeModelUrl}
         alt={`3D Model of ${dish.name}`}
         ar
-        ar-modes="scene-viewer webxr quick-look"
+        ar-modes="webxr scene-viewer quick-look"
         ar-scale="auto"
         ar-placement={placementMode}
         camera-controls
@@ -225,6 +188,84 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
         className={`model-viewer-viewport ${isLayerMode ? 'exploded-visual' : ''}`}
         onLoad={() => setIsModelLoaded(true)}
       >
+        {/* IN-CAMERA LIVE HUD (WebXR DOM Overlay & 3D Canvas Top Bar) */}
+        <div className="in-camera-live-hud" slot="ar-overlay">
+          <div className="in-camera-top-bar">
+            {/* Left Controls: Menu & Reset */}
+            <div className="camera-hud-group">
+              <button
+                type="button"
+                className="camera-hud-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBack();
+                }}
+              >
+                <ArrowLeft size={16} />
+                <span>Menu</span>
+              </button>
+
+              <button
+                type="button"
+                className="camera-hud-btn reset-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleResetCamera();
+                }}
+                title="Reset Camera Orientation & Alignment"
+              >
+                <RotateCcw size={15} />
+                <span>Reset</span>
+              </button>
+            </div>
+
+            {/* Right Controls: Ground Mount, Wall Mount, Explode Layers */}
+            <div className="camera-hud-group">
+              {/* Ground Mount */}
+              <button
+                type="button"
+                className={`camera-hud-btn ${placementMode === 'floor' ? 'active-mode' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTogglePlacement('floor');
+                }}
+                title="Mount 3D Dish on Dining Table or Ground"
+              >
+                <Grid size={15} />
+                <span>🪑 Ground</span>
+              </button>
+
+              {/* Wall Mount */}
+              <button
+                type="button"
+                className={`camera-hud-btn ${placementMode === 'wall' ? 'active-mode' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTogglePlacement('wall');
+                }}
+                title="Mount 3D Dish on Vertical Wall or Menu Board"
+              >
+                <Square size={15} />
+                <span>🧱 Wall</span>
+              </button>
+
+              {/* Explode Layers */}
+              <button
+                type="button"
+                className={`camera-hud-btn ${isLayerMode ? 'active-layer-btn' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleLayerMode();
+                }}
+                title="Deconstruct into 3D ingredient layers"
+              >
+                <Layers size={15} />
+                <span>{isLayerMode ? 'Collapse' : '✨ Explode'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Custom Loading Poster Slot */}
         <div slot="poster" className="model-viewer-poster">
           <div className="poster-loader-card">
@@ -243,6 +284,7 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
         {isLayerMode && layers.map((layer) => (
           <button
             key={layer.id}
+            type="button"
             slot={`hotspot-layer-${layer.id}`}
             data-position={layer.position}
             data-normal="0 1 0"
@@ -266,6 +308,7 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
         {/* Hidden Model-Viewer AR Trigger */}
         <button
           slot="ar-button"
+          type="button"
           style={{ display: 'none' }}
           onClick={(e) => {
             e.preventDefault();

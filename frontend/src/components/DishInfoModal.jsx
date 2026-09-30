@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { X, Flame, Check, ShoppingBag, Clock, Sparkles, Camera } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { placeOrder } from '../services/api';
-import { launchRealARCamera } from '../services/arLauncher';
 
 export default function DishInfoModal({ dish, onClose, onSelectAR }) {
   const [isOrdered, setIsOrdered] = useState(false);
@@ -29,7 +28,6 @@ export default function DishInfoModal({ dish, onClose, onSelectAR }) {
 
   const handleLaunchAR = () => {
     onClose();
-    launchRealARCamera(dish);
     if (onSelectAR) {
       onSelectAR(dish, true);
     }

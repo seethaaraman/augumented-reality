@@ -1,21 +1,17 @@
 import React, { useState } from 'react';
 import { Sparkles, Flame, Clock, Award, Eye, Camera, Loader2 } from 'lucide-react';
-import { launchRealARCamera } from '../services/arLauncher';
 
 export default function RestaurantMenu({ dishes = [], onSelectAR, onSelectDish }) {
   const [isLaunchingFeatured, setIsLaunchingFeatured] = useState(false);
   const biryani = dishes.find((d) => d.id === 'chicken-biryani') || dishes[0];
   const otherDishes = dishes.filter((d) => d.id !== 'chicken-biryani');
 
-  const handleLaunchFeaturedAR = async () => {
+  const handleLaunchFeaturedAR = () => {
     if (!biryani) return;
     setIsLaunchingFeatured(true);
-    try {
-      launchRealARCamera(biryani);
-      onSelectAR(biryani, true);
-    } finally {
-      setTimeout(() => setIsLaunchingFeatured(false), 2000);
-    }
+    // Delegate cleanly to ARView via onSelectAR without colliding duplicate intent
+    onSelectAR(biryani, true);
+    setTimeout(() => setIsLaunchingFeatured(false), 1500);
   };
 
   return (
@@ -180,27 +176,27 @@ export default function RestaurantMenu({ dishes = [], onSelectAR, onSelectDish }
               {dish.isARAvailable && (
                 <div style={{ display: 'flex', gap: '8px' }} onClick={(e) => e.stopPropagation()}>
                   <button
+                    type="button"
                     className="btn-card-ar"
-                    onClick={() => {
-                      launchRealARCamera(dish);
+                    onClick={(e) => {
+                      e.stopPropagation();
                       onSelectAR(dish, true);
                     }}
-                    title="Launch Google AR camera on table"
+                    title="Launch AR camera on table"
                   >
-                    <Camera size={14} />
+                    <Camera size={15} />
                     Launch AR
                   </button>
                   <button
-                    className="btn-card-ar"
-                    style={{
-                      background: 'rgba(255, 255, 255, 0.06)',
-                      borderColor: 'rgba(255, 255, 255, 0.15)',
-                      color: '#cbd5e1'
+                    type="button"
+                    className="btn-card-ar btn-card-3d"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectAR(dish, false);
                     }}
-                    onClick={() => onSelectAR(dish, false)}
                     title="Inspect 3D Model"
                   >
-                    <Eye size={14} />
+                    <Eye size={15} />
                     3D
                   </button>
                 </div>

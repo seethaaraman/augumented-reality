@@ -18,6 +18,7 @@ public class NativeARPlugin extends Plugin {
     public void launchAR(PluginCall call) {
         String glbUrl = call.getString("glbUrl");
         String title = call.getString("title", "Royal Spice Dish");
+        boolean verticalPlacement = call.getBoolean("verticalPlacement", false);
 
         if (glbUrl == null || glbUrl.isEmpty()) {
             call.reject("Model GLB URL is required");
@@ -26,7 +27,7 @@ public class NativeARPlugin extends Plugin {
 
         MainActivity activity = (MainActivity) getActivity();
         if (activity != null) {
-            boolean success = activity.launchSceneViewer(glbUrl, title);
+            boolean success = activity.launchSceneViewer(glbUrl, title, verticalPlacement);
             if (success) {
                 JSObject ret = new JSObject();
                 ret.put("success", true);
@@ -46,14 +47,14 @@ public class NativeARPlugin extends Plugin {
         if (urlStr.startsWith("intent://arvr.google.com") || urlStr.contains("arvr.google.com/scene-viewer")) {
             try {
                 Intent intent = Intent.parseUri(urlStr, Intent.URI_INTENT_SCHEME);
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                 getContext().startActivity(intent);
                 return true;
             } catch (Exception e) {
                 Log.w(TAG, "shouldOverrideLoad parseUri fallback: " + e.getMessage());
                 try {
                     Intent fallback = new Intent(Intent.ACTION_VIEW, url);
-                    fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
                     getContext().startActivity(fallback);
                     return true;
                 } catch (Exception ex) {

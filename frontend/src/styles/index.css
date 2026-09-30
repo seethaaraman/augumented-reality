@@ -35,6 +35,11 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+button, [role="button"], a, input, select, textarea {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   font-family: var(--font-body);
   background-color: var(--bg-primary);
@@ -371,29 +376,53 @@ body {
 .btn-card-ar {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  background: rgba(245, 158, 11, 0.14);
-  border: 1px solid rgba(245, 158, 11, 0.45);
-  color: var(--accent-gold);
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  min-width: 46px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(217, 119, 6, 0.28));
+  border: 1.5px solid rgba(245, 158, 11, 0.65);
+  color: #fbbf24;
   border-radius: var(--radius-full);
   font-family: var(--font-display);
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
 .btn-card-ar:hover {
-  background: var(--accent-gold);
+  background: linear-gradient(135deg, #f59e0b, #d97706);
   color: #000000;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.45);
+  border-color: #f59e0b;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.5);
 }
 
 .btn-card-ar:active {
-  transform: translateY(0);
+  transform: scale(0.95);
+}
+
+.btn-card-3d {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #e2e8f0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
+}
+
+.btn-card-3d:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  color: #ffffff !important;
+}
+
+.btn-card-3d:active {
+  transform: scale(0.95);
 }
 
 /* ---------------------------------------------------- */
@@ -482,7 +511,115 @@ body {
 }
 
 
-/* AR Screen Top Nav HUD */
+/* ---------------------------------------------------- */
+/* IN-CAMERA LIVE HUD (WebXR Live Camera & 3D Canvas)   */
+/* ---------------------------------------------------- */
+.in-camera-live-hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  padding: 16px 16px 8px;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(7, 9, 15, 0.9) 0%, rgba(7, 9, 15, 0.45) 60%, transparent 100%);
+}
+
+.in-camera-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  max-width: 900px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+}
+
+.camera-hud-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.camera-hud-btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 14px;
+  background: rgba(18, 22, 34, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #f1f5f9;
+  border-radius: var(--radius-full);
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.camera-hud-btn:hover {
+  background: rgba(30, 36, 56, 0.95);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.camera-hud-btn:active {
+  transform: scale(0.95);
+}
+
+/* Active Mount Modes (Ground vs Wall) */
+.camera-hud-btn.active-mode {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  color: #000000 !important;
+  border-color: #fbbf24 !important;
+  box-shadow: 0 4px 18px rgba(245, 158, 11, 0.55), 0 0 10px rgba(251, 191, 36, 0.4) !important;
+}
+
+/* Active Explode Layer Button */
+.camera-hud-btn.active-layer-btn {
+  background: linear-gradient(135deg, #ec4899 0%, #a855f7 100%) !important;
+  color: #ffffff !important;
+  border-color: #f472b6 !important;
+  box-shadow: 0 4px 18px rgba(236, 72, 153, 0.55) !important;
+}
+
+/* Reset Button */
+.camera-hud-btn.reset-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #cbd5e1;
+}
+
+.camera-hud-btn.reset-btn:hover,
+.camera-hud-btn.reset-btn:active {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.15);
+}
+
+@media (max-width: 480px) {
+  .in-camera-top-bar {
+    justify-content: center;
+  }
+  .camera-hud-group {
+    justify-content: center;
+  }
+  .camera-hud-btn {
+    padding: 8px 12px;
+    font-size: 0.78rem;
+  }
+}
+
+/* AR Screen Top Nav HUD Fallback */
 .ar-top-hud {
   position: absolute;
   top: 0;
@@ -502,6 +639,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-height: 44px;
   padding: 10px 18px;
   background: rgba(20, 22, 32, 0.85);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -510,6 +648,8 @@ body {
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   transition: all 0.2s ease;
@@ -518,6 +658,10 @@ body {
 .hud-btn:hover {
   background: rgba(35, 38, 55, 0.95);
   border-color: rgba(255, 255, 255, 0.3);
+}
+
+.hud-btn:active {
+  transform: scale(0.96);
 }
 
 /* AR Instruction Banner */

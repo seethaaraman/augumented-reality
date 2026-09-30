@@ -1,21 +1,32 @@
 package com.arrestaurant.app;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.webkit.JavascriptInterface;
 import android.widget.Toast;
 
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     private static final String TAG = "MainActivityAR";
+    private static final int CAMERA_PERMISSION_CODE = 101;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(NativeARPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // Pre-request camera permission so ARCore camera session starts with zero delay and no black screen
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
+        }
 
         // Register direct JavaScript interface on WebView for instant zero-latency AR launch
         if (getBridge() != null && getBridge().getWebView() != null) {
@@ -25,8 +36,13 @@ public class MainActivity extends BridgeActivity {
 
     public class ARJavaScriptBridge {
         @JavascriptInterface
+        public boolean launchAR(String glbUrl, String title, boolean verticalPlacement) {
+            return launchSceneViewer(glbUrl, title, verticalPlacement);
+        }
+
+        @JavascriptInterface
         public boolean launchAR(String glbUrl, String title) {
-            return launchSceneViewer(glbUrl, title);
+            return launchSceneViewer(glbUrl, title, false);
         }
 
         @JavascriptInterface
@@ -36,23 +52,33 @@ public class MainActivity extends BridgeActivity {
     }
 
     public boolean launchSceneViewer(String glbUrl, String title) {
+        return launchSceneViewer(glbUrl, title, false);
+    }
+
+    public boolean launchSceneViewer(String glbUrl, String title, boolean verticalPlacement) {
         if (glbUrl == null || glbUrl.isEmpty()) {
             return false;
         }
 
+        // Ensure camera permission is granted
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, CAMERA_PERMISSION_CODE);
+        }
+
         try {
             String safeTitle = (title != null && !title.isEmpty()) ? title : "Royal Spice AR Dish";
-            Log.d(TAG, "Launching SceneViewer for: " + glbUrl + " (" + safeTitle + ")");
+            String verticalParam = verticalPlacement ? "enable_vertical_placement=true" : "enable_vertical_placement=false";
+            Log.d(TAG, "Launching SceneViewer for: " + glbUrl + " (" + safeTitle + "), vertical=" + verticalPlacement);
 
-            // 1. Google App SceneViewer Intent (mode=ar_preferred & disable_occlusion=true prevents black screen)
+            // 1. Google App SceneViewer Intent with vertical placement flag & anti-blackscreen flags
             String sceneViewerUri = "intent://arvr.google.com/scene-viewer/1.2?file=" +
                     Uri.encode(glbUrl) +
-                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=" +
+                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&" + verticalParam + "&title=" +
                     Uri.encode(safeTitle) +
                     "#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;end;";
 
             Intent quickSearchIntent = Intent.parseUri(sceneViewerUri, Intent.URI_INTENT_SCHEME);
-            quickSearchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            quickSearchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
             if (quickSearchIntent.resolveActivity(getPackageManager()) != null) {
                 Log.d(TAG, "Launching SceneViewer via Google QuickSearchBox App");
@@ -63,12 +89,12 @@ public class MainActivity extends BridgeActivity {
             // 2. Generic SceneViewer Intent (Resolves through Google Play Services for AR / ARCore)
             String genericUri = "intent://arvr.google.com/scene-viewer/1.2?file=" +
                     Uri.encode(glbUrl) +
-                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=" +
+                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&" + verticalParam + "&title=" +
                     Uri.encode(safeTitle) +
                     "#Intent;scheme=https;action=android.intent.action.VIEW;end;";
 
             Intent genericIntent = Intent.parseUri(genericUri, Intent.URI_INTENT_SCHEME);
-            genericIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            genericIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
             if (genericIntent.resolveActivity(getPackageManager()) != null) {
                 Log.d(TAG, "Launching SceneViewer via Generic Intent");
@@ -79,11 +105,11 @@ public class MainActivity extends BridgeActivity {
             // 3. Fallback: Direct Intent to Google Chrome (Chrome launches SceneViewer directly)
             String httpsUri = "https://arvr.google.com/scene-viewer/1.2?file=" +
                     Uri.encode(glbUrl) +
-                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=" +
+                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&" + verticalParam + "&title=" +
                     Uri.encode(safeTitle);
 
             Intent chromeIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
-            chromeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            chromeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             chromeIntent.setPackage("com.android.chrome");
 
             if (chromeIntent.resolveActivity(getPackageManager()) != null) {
@@ -94,7 +120,7 @@ public class MainActivity extends BridgeActivity {
 
             // 4. Fallback: Any default browser
             Intent defaultBrowserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
-            defaultBrowserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            defaultBrowserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             startActivity(defaultBrowserIntent);
             return true;
 
