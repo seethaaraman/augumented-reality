@@ -214,6 +214,14 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
   // Launch Google SceneViewer if user explicitly desires external native plane tracking
   const handleLaunchExternalGoogleAR = async () => {
     setIsLaunchingNativeAR(true);
+    setInstruction('🚀 Launching Google ARCore SceneViewer...');
+
+    // CRITICAL: Release the in-app camera hardware lock so Google ARCore can acquire the camera
+    stopCamera();
+
+    // Give Android Camera HAL 500ms to cleanly release camera sensor lock
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
     try {
       await launchRealARCamera(dish, placementMode);
     } catch (err) {
@@ -362,6 +370,15 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
             </div>
           </div>
         </div>
+
+        {/* Slotted AR button to prevent model-viewer default button from bypassing camera release */}
+        <button
+          slot="ar-button"
+          id="custom-model-viewer-ar-btn"
+          type="button"
+          style={{ display: 'none' }}
+          aria-hidden="true"
+        />
 
         {/* 3D Interactive Hotspots (Rendered in true 3D space when Layer Mode is active) */}
         {isLayerMode && layers.map((layer) => (

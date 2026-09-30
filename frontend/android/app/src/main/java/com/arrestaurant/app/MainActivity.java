@@ -44,6 +44,23 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Pause WebView to cleanly release camera hardware locks when opening SceneViewer or backgrounding
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().onPause();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().onResume();
+        }
+    }
+
     public class ARJavaScriptBridge {
         @JavascriptInterface
         public boolean launchAR(String glbUrl, String title, boolean verticalPlacement) {
@@ -80,12 +97,41 @@ public class MainActivity extends BridgeActivity {
             String verticalParam = verticalPlacement ? "enable_vertical_placement=true" : "enable_vertical_placement=false";
             Log.d(TAG, "Launching SceneViewer for: " + glbUrl + " (" + safeTitle + "), vertical=" + verticalPlacement);
 
-            // 1. Google App SceneViewer Intent with vertical placement flag & anti-blackscreen flags
-            String sceneViewerUri = "intent://arvr.google.com/scene-viewer/1.2?file=" +
+            String httpsUri = "https://arvr.google.com/scene-viewer/1.0?file=" +
+                    Uri.encode(glbUrl) +
+                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&" + verticalParam + "&title=" +
+                    Uri.encode(safeTitle);
+
+            // 1. Primary: Explicit Intent targeting Google Play Services for AR (com.google.ar.core)
+            Intent arcoreIntent = new Intent(Intent.ACTION_VIEW);
+            Uri arcoreUri = Uri.parse("https://arvr.google.com/scene-viewer/1.0").buildUpon()
+                    .appendQueryParameter("file", glbUrl)
+                    .appendQueryParameter("mode", "ar_preferred")
+                    .appendQueryParameter("title", safeTitle)
+                    .appendQueryParameter("resizable", "true")
+                    .appendQueryParameter("disable_occlusion", "true")
+                    .appendQueryParameter("enable_vertical_placement", verticalPlacement ? "true" : "false")
+                    .appendQueryParameter("browser_fallback_url", httpsUri)
+                    .build();
+
+            arcoreIntent.setData(arcoreUri);
+            arcoreIntent.setPackage("com.google.ar.core");
+            arcoreIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+            if (arcoreIntent.resolveActivity(getPackageManager()) != null) {
+                Log.d(TAG, "Launching SceneViewer via com.google.ar.core");
+                startActivity(arcoreIntent);
+                return true;
+            }
+
+            // 2. Google QuickSearchBox App fallback (Google App)
+            String sceneViewerUri = "intent://arvr.google.com/scene-viewer/1.0?file=" +
                     Uri.encode(glbUrl) +
                     "&mode=ar_preferred&resizable=true&disable_occlusion=true&" + verticalParam + "&title=" +
                     Uri.encode(safeTitle) +
-                    "#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;end;";
+                    "#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=" +
+                    Uri.encode(httpsUri) +
+                    ";end;";
 
             Intent quickSearchIntent = Intent.parseUri(sceneViewerUri, Intent.URI_INTENT_SCHEME);
             quickSearchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
@@ -96,28 +142,7 @@ public class MainActivity extends BridgeActivity {
                 return true;
             }
 
-            // 2. Generic SceneViewer Intent (Resolves through Google Play Services for AR / ARCore)
-            String genericUri = "intent://arvr.google.com/scene-viewer/1.2?file=" +
-                    Uri.encode(glbUrl) +
-                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&" + verticalParam + "&title=" +
-                    Uri.encode(safeTitle) +
-                    "#Intent;scheme=https;action=android.intent.action.VIEW;end;";
-
-            Intent genericIntent = Intent.parseUri(genericUri, Intent.URI_INTENT_SCHEME);
-            genericIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
-            if (genericIntent.resolveActivity(getPackageManager()) != null) {
-                Log.d(TAG, "Launching SceneViewer via Generic Intent");
-                startActivity(genericIntent);
-                return true;
-            }
-
-            // 3. Fallback: Direct Intent to Google Chrome (Chrome launches SceneViewer directly)
-            String httpsUri = "https://arvr.google.com/scene-viewer/1.2?file=" +
-                    Uri.encode(glbUrl) +
-                    "&mode=ar_preferred&resizable=true&disable_occlusion=true&" + verticalParam + "&title=" +
-                    Uri.encode(safeTitle);
-
+            // 3. Fallback: Direct Intent to Google Chrome
             Intent chromeIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
             chromeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             chromeIntent.setPackage("com.android.chrome");
@@ -128,7 +153,7 @@ public class MainActivity extends BridgeActivity {
                 return true;
             }
 
-            // 4. Fallback: Any default browser
+            // 4. Fallback: Default Browser
             Intent defaultBrowserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
             defaultBrowserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
             startActivity(defaultBrowserIntent);

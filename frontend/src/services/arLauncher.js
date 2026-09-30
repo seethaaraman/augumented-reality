@@ -2,16 +2,35 @@ import { registerPlugin, Capacitor } from '@capacitor/core';
 
 const NativeAR = registerPlugin('NativeAR');
 
-const GITHUB_CDN_BASE = 'https://raw.githubusercontent.com/seethaaraman/augumented-reality/main/frontend/public/models';
+const JSDELIVR_CDN_BASE = 'https://cdn.jsdelivr.net/gh/seethaaraman/augumented-reality@main/frontend/public/models';
+
+const MODEL_FILE_MAP = {
+  'chicken-biryani': 'biryani.glb',
+  'biryani': 'biryani.glb',
+  'artisan-cake': 'cake.glb',
+  'cake': 'cake.glb',
+  'butter-chicken': 'butter-chicken.glb',
+  'paneer-tikka': 'paneer-tikka.glb',
+  'fresh-lime-soda': 'lime-soda.glb',
+  'lime-soda': 'lime-soda.glb'
+};
 
 /**
  * Returns a guaranteed absolute public HTTPS URL for the 3D model.
  * Google SceneViewer and ARCore require public HTTPS URLs to download and render models.
+ * Uses jsDelivr CDN for correct 'model/gltf-binary' MIME type and global edge caching.
  */
 export function getPublicModelUrl(dish) {
-  if (!dish) return `${GITHUB_CDN_BASE}/biryani.glb`;
+  if (!dish) return `${JSDELIVR_CDN_BASE}/biryani.glb`;
 
+  // Custom user-scanned dish uploaded to Cloudinary
   if (dish.remoteModelUrl && dish.remoteModelUrl.startsWith('https://')) {
+    if (dish.remoteModelUrl.includes('raw.githubusercontent.com')) {
+      const parts = dish.remoteModelUrl.split('/');
+      const last = parts[parts.length - 1].replace('.glb', '');
+      const mapped = MODEL_FILE_MAP[last] || `${last}.glb`;
+      return `${JSDELIVR_CDN_BASE}/${mapped}`;
+    }
     return dish.remoteModelUrl;
   }
 
@@ -19,8 +38,8 @@ export function getPublicModelUrl(dish) {
     return dish.modelUrl;
   }
 
-  const modelFilename = dish.id === 'artisan-cake' ? 'cake.glb' : `${dish.id}.glb`;
-  return `${GITHUB_CDN_BASE}/${modelFilename}`;
+  const filename = MODEL_FILE_MAP[dish.id] || (dish.id ? `${dish.id}.glb` : 'biryani.glb');
+  return `${JSDELIVR_CDN_BASE}/${filename}`;
 }
 
 let isLaunchingARLock = false;
@@ -84,9 +103,11 @@ export async function launchRealARCamera(dish, placementMode = 'floor') {
   const encodedTitle = encodeURIComponent(dishTitle);
 
   if (isAndroid) {
-    // enable_vertical_placement enables wall/vertical surface detection in Google SceneViewer
     const verticalParam = isWall ? 'enable_vertical_placement=true' : 'enable_vertical_placement=false';
-    const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&${verticalParam}&title=${encodedTitle}#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;end;`;
+    const httpsFallback = `https://arvr.google.com/scene-viewer/1.0?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&${verticalParam}&title=${encodedTitle}`;
+    
+    // Explicit Intent to Google Play Services for AR (ARCore) with browser fallback
+    const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.0?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&${verticalParam}&title=${encodedTitle}#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(httpsFallback)};end;`;
     
     try {
       const link = document.createElement('a');
@@ -102,10 +123,9 @@ export async function launchRealARCamera(dish, placementMode = 'floor') {
       console.warn('[ARLauncher] Intent click failed, falling back to HTTPS', e);
     }
 
-    // Android Chrome fallback: Direct https SceneViewer link with vertical placement parameter
-    const httpsUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&${verticalParam}&title=${encodedTitle}`;
+    // Android Chrome fallback: Direct https SceneViewer link
     try {
-      window.location.href = httpsUrl;
+      window.location.href = httpsFallback;
       return true;
     } catch (err) {
       console.error('[ARLauncher] Fallback navigation error:', err);
@@ -117,4 +137,5 @@ export async function launchRealARCamera(dish, placementMode = 'floor') {
   console.log('[ARLauncher] Desktop browser detected. Using in-app 3D canvas viewer.');
   return false;
 }
+
 

@@ -1,4 +1,4 @@
-const GITHUB_MODELS_CDN = 'https://raw.githubusercontent.com/seethaaraman/augumented-reality/main/frontend/public/models';
+const GITHUB_MODELS_CDN = 'https://cdn.jsdelivr.net/gh/seethaaraman/augumented-reality@main/frontend/public/models';
 
 export const DISHES_DATA = [
   {

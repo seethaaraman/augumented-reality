@@ -45,6 +45,22 @@ public class NativeARPlugin extends Plugin {
 
         // Intercept any scene-viewer intent or web link triggered by model-viewer
         if (urlStr.startsWith("intent://arvr.google.com") || urlStr.contains("arvr.google.com/scene-viewer")) {
+            MainActivity activity = (MainActivity) getActivity();
+            if (activity != null) {
+                try {
+                    Uri parsed = Uri.parse(urlStr);
+                    String fileUrl = parsed.getQueryParameter("file");
+                    String title = parsed.getQueryParameter("title");
+                    boolean vertical = "true".equalsIgnoreCase(parsed.getQueryParameter("enable_vertical_placement"));
+                    if (fileUrl != null && !fileUrl.isEmpty()) {
+                        boolean ok = activity.launchSceneViewer(fileUrl, title, vertical);
+                        if (ok) return true;
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "shouldOverrideLoad parse params error: " + e.getMessage());
+                }
+            }
+
             try {
                 Intent intent = Intent.parseUri(urlStr, Intent.URI_INTENT_SCHEME);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
