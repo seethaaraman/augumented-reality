@@ -70,8 +70,8 @@ export async function launchRealARCamera(dish) {
   const encodedTitle = encodeURIComponent(dishTitle);
 
   if (isAndroid) {
-    // mode=ar_preferred & disable_occlusion=true prevents black camera feed and depth sensor occlusion
-    const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=${encodedTitle}#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;end;`;
+    // enable_vertical_placement=true allows placing models on walls, partitions, and vertical surfaces in addition to floors and tables
+    const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=true&title=${encodedTitle}#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;end;`;
     
     try {
       const link = document.createElement('a');
@@ -87,8 +87,8 @@ export async function launchRealARCamera(dish) {
       console.warn('[ARLauncher] Intent click failed, falling back to HTTPS', e);
     }
 
-    // Android Chrome fallback: Direct https SceneViewer link
-    const httpsUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=false&title=${encodedTitle}`;
+    // Android Chrome fallback: Direct https SceneViewer link with vertical placement
+    const httpsUrl = `https://arvr.google.com/scene-viewer/1.2?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&enable_vertical_placement=true&title=${encodedTitle}`;
     try {
       window.location.href = httpsUrl;
       return true;

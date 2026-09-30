@@ -50,3 +50,7 @@ Thumbs.db
 .env
 .env.*
 *.env
+
+# Temporary scan models
+temp_*.glb
+backend/temp_*.glb

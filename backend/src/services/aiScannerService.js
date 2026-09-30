@@ -46,16 +46,29 @@ export async function generate3DFromImage(imagePath) {
   const glbOutput = make3dResult.data[1];
   console.log('[AI Scanner] GLB generated successfully:', glbOutput);
 
-  // Return the path or url of the generated GLB
-  if (glbOutput && glbOutput.url) {
-    return glbOutput.url;
-  }
-  if (glbOutput && glbOutput.path) {
-    return glbOutput.path;
-  }
-  if (typeof glbOutput === 'string') {
-    return glbOutput;
+  let targetUrlOrPath = glbOutput?.url || glbOutput?.path || (typeof glbOutput === 'string' ? glbOutput : null);
+
+  if (!targetUrlOrPath) {
+    throw new Error('No GLB output was produced by the 3D generator');
   }
 
-  throw new Error('No GLB output was produced by the 3D generator');
+  // If it's a remote URL from Hugging Face, download it locally with HF_TOKEN authentication
+  if (targetUrlOrPath.startsWith('http://') || targetUrlOrPath.startsWith('https://')) {
+    console.log(`[AI Scanner] Downloading GLB locally with authentication...`);
+    const response = await fetch(targetUrlOrPath, {
+      headers: hfToken ? { Authorization: `Bearer ${hfToken}` } : {}
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to download generated GLB from Hugging Face: ${response.status} ${response.statusText}`);
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const localGlbPath = path.join(path.resolve(__dirname, '../../'), `temp_generated_${Date.now()}.glb`);
+    fs.writeFileSync(localGlbPath, Buffer.from(arrayBuffer));
+    console.log(`[AI Scanner] Downloaded GLB to local path: ${localGlbPath}`);
+    return localGlbPath;
+  }
+
+  return targetUrlOrPath;
 }
