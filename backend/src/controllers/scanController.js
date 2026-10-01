@@ -1,27 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import Dish from '../models/Dish.js';
 import cloudinary, { uploadGlbModel } from '../services/cloudinaryService.js';
 import { generate3DFromImage } from '../services/aiScannerService.js';
 import { extractFrameFromVideo } from '../services/videoProcessorService.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const CUSTOM_DISHES_PATH = path.resolve(__dirname, '../data/customDishes.json');
-
-function writeCustomDishesBackup(dish) {
-  try {
-    let existing = [];
-    if (fs.existsSync(CUSTOM_DISHES_PATH)) {
-      existing = JSON.parse(fs.readFileSync(CUSTOM_DISHES_PATH, 'utf8') || '[]');
-    }
-    existing.unshift(dish);
-    fs.writeFileSync(CUSTOM_DISHES_PATH, JSON.stringify(existing, null, 2), 'utf8');
-  } catch (err) {
-    console.warn('[ScanController] Backup file sync warning:', err.message);
-  }
-}
 
 function slugify(text) {
   return (text || 'dish')
@@ -137,7 +119,6 @@ export async function createScannedDish(req, res) {
 
     // Save directly to MongoDB
     const newDish = await Dish.create(dishData);
-    writeCustomDishesBackup(newDish.toJSON());
 
     console.log(`🍃 [ScanController] Dish successfully created in MongoDB: ${newDish.name} (${newDish.id})`);
 
@@ -294,7 +275,6 @@ export async function saveScannedDishMetadata(req, res) {
     };
 
     const newDish = await Dish.create(dishData);
-    writeCustomDishesBackup(newDish.toJSON());
 
     console.log(`🍃 [ScanController] Direct dish metadata saved in MongoDB: ${newDish.name}`);
     return res.status(201).json({
