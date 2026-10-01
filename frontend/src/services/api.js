@@ -1,5 +1,4 @@
 import { Capacitor } from '@capacitor/core';
-import { DISHES_DATA } from '../../../backend/src/data/dishesData.js';
 
 export function getApiBase() {
   if (Capacitor.isNativePlatform()) {
@@ -12,44 +11,58 @@ export function getApiBase() {
 export const API_BASE = getApiBase();
 
 /**
- * Fetches the restaurant menu from the backend API.
- * Automatically falls back to static dish data if the backend server is unreachable.
+ * Fetches the restaurant menu directly from the MongoDB backend database API.
  */
 export async function fetchMenu() {
   try {
-    const res = await fetch(`${getApiBase()}/menu`, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(`${getApiBase()}/menu`, { signal: AbortSignal.timeout(6000) });
     if (res.ok) {
       const json = await res.json();
-      if (json.success && json.data) {
+      if (json.success && Array.isArray(json.data)) {
         return json.data;
       }
     }
+    throw new Error(`Server returned HTTP ${res.status}`);
   } catch (err) {
-    console.warn('[Frontend API] Backend server unreachable, using offline fallback menu.', err.message);
+    console.error('[Frontend API] Error fetching menu from MongoDB database:', err.message);
+    throw err;
   }
-  return DISHES_DATA;
 }
 
 /**
- * Places a simulated order via the backend API.
+ * Places a real order stored directly in the MongoDB backend database.
  */
-export async function placeOrder(dishId, quantity = 1) {
+export async function placeOrder(dishId, quantity = 1, specialInstructions = '', tableNumber = 'Table 4') {
   try {
-    const res = await fetch(`${API_BASE}/orders`, {
+    const res = await fetch(`${getApiBase()}/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dishId, quantity }),
-      signal: AbortSignal.timeout(3000)
+      body: JSON.stringify({ dishId, quantity, specialInstructions, tableNumber }),
+      signal: AbortSignal.timeout(6000)
     });
     if (res.ok) {
       return await res.json();
     }
+    const errJson = await res.json().catch(() => ({}));
+    throw new Error(errJson.message || `HTTP ${res.status}`);
   } catch (err) {
-    console.warn('[Frontend API] Order fallback simulated locally.', err.message);
+    console.error('[Frontend API] Error placing order in MongoDB:', err.message);
+    throw err;
   }
-  return {
-    success: true,
-    message: 'Order placed successfully (Demo mode)',
-    data: { orderId: `ORD-${Date.now().toString().slice(-6)}` }
-  };
+}
+
+/**
+ * Fetches all orders from the MongoDB database.
+ */
+export async function fetchOrders() {
+  try {
+    const res = await fetch(`${getApiBase()}/orders`, { signal: AbortSignal.timeout(6000) });
+    if (res.ok) {
+      const json = await res.json();
+      return json.data || [];
+    }
+  } catch (err) {
+    console.error('[Frontend API] Error fetching orders from MongoDB:', err.message);
+  }
+  return [];
 }

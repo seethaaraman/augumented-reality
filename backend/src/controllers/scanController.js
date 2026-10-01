@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import Dish from '../models/Dish.js';
 import { uploadGlbModel } from '../services/cloudinaryService.js';
 import { generate3DFromImage } from '../services/aiScannerService.js';
 import { extractFrameFromVideo } from '../services/videoProcessorService.js';
@@ -9,25 +10,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const CUSTOM_DISHES_PATH = path.resolve(__dirname, '../data/customDishes.json');
 
-function readCustomDishes() {
+function writeCustomDishesBackup(dish) {
   try {
-    if (!fs.existsSync(CUSTOM_DISHES_PATH)) {
-      fs.writeFileSync(CUSTOM_DISHES_PATH, '[]', 'utf8');
-      return [];
+    let existing = [];
+    if (fs.existsSync(CUSTOM_DISHES_PATH)) {
+      existing = JSON.parse(fs.readFileSync(CUSTOM_DISHES_PATH, 'utf8') || '[]');
     }
-    const data = fs.readFileSync(CUSTOM_DISHES_PATH, 'utf8');
-    return JSON.parse(data || '[]');
+    existing.unshift(dish);
+    fs.writeFileSync(CUSTOM_DISHES_PATH, JSON.stringify(existing, null, 2), 'utf8');
   } catch (err) {
-    console.error('[ScanController] Error reading custom dishes:', err);
-    return [];
-  }
-}
-
-function writeCustomDishes(dishes) {
-  try {
-    fs.writeFileSync(CUSTOM_DISHES_PATH, JSON.stringify(dishes, null, 2), 'utf8');
-  } catch (err) {
-    console.error('[ScanController] Error writing custom dishes:', err);
+    console.warn('[ScanController] Backup file sync warning:', err.message);
   }
 }
 
@@ -42,7 +34,7 @@ function slugify(text) {
 }
 
 /**
- * Handles 3D scanning or direct model upload, saves to Cloudinary, and registers dish.
+ * Handles 3D scanning or direct model upload, saves to Cloudinary, and stores dish in MongoDB.
  */
 export async function createScannedDish(req, res) {
   let tempFilePath = req.file?.path;
@@ -75,7 +67,7 @@ export async function createScannedDish(req, res) {
     const isVideoFile = ['.mp4', '.mov', '.webm', '.m4v', '.avi'].includes(ext) || req.file.mimetype?.startsWith('video/');
 
     if (isGlbFile) {
-      // 1. Direct .glb upload (e.g. from Meshy, Sketchfab, or scanned asset)
+      // 1. Direct .glb upload
       console.log(`[ScanController] Direct .glb uploaded: ${req.file.originalname}`);
       publicGlbUrl = await uploadGlbModel(tempFilePath, dishSlug);
     } else if (isVideoFile) {
@@ -121,7 +113,7 @@ export async function createScannedDish(req, res) {
 
     const numericPrice = parseInt(String(price).replace(/[^0-9]/g, '')) || 290;
 
-    const newDish = {
+    const dishData = {
       id: `custom-${dishSlug}-${Date.now().toString().slice(-4)}`,
       name,
       tagline,
@@ -140,19 +132,18 @@ export async function createScannedDish(req, res) {
       modelUrl: publicGlbUrl,
       remoteModelUrl: publicGlbUrl,
       colorAccent: dietary === 'Vegetarian' ? '#10b981' : '#f59e0b',
-      createdAt: new Date().toISOString()
+      isCustom: true
     };
 
-    // Save to persistent storage
-    const customDishes = readCustomDishes();
-    customDishes.unshift(newDish);
-    writeCustomDishes(customDishes);
+    // Save directly to MongoDB
+    const newDish = await Dish.create(dishData);
+    writeCustomDishesBackup(newDish.toJSON());
 
-    console.log(`[ScanController] Dish successfully created: ${newDish.name} (${newDish.id})`);
+    console.log(`🍃 [ScanController] Dish successfully created in MongoDB: ${newDish.name} (${newDish.id})`);
 
     return res.status(201).json({
       success: true,
-      message: '3D Dish successfully scanned and added to menu!',
+      message: '3D Dish successfully scanned and saved to MongoDB!',
       data: newDish
     });
   } catch (error) {
@@ -163,7 +154,6 @@ export async function createScannedDish(req, res) {
       error: error.message
     });
   } finally {
-    // Clean up temporary upload file if it exists
     if (tempFilePath && fs.existsSync(tempFilePath)) {
       try {
         fs.unlinkSync(tempFilePath);
@@ -173,30 +163,44 @@ export async function createScannedDish(req, res) {
 }
 
 /**
- * Retrieve all user-scanned custom dishes
+ * Retrieve all user-scanned custom dishes from MongoDB
  */
-export function getCustomDishes(req, res) {
-  const dishes = readCustomDishes();
-  return res.status(200).json({
-    success: true,
-    count: dishes.length,
-    data: dishes
-  });
+export async function getCustomDishes(req, res) {
+  try {
+    const dishes = await Dish.find({ isCustom: true }).sort({ createdAt: -1 }).lean();
+    return res.status(200).json({
+      success: true,
+      source: 'mongodb',
+      count: dishes.length,
+      data: dishes
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch custom dishes from MongoDB',
+      error: err.message
+    });
+  }
 }
 
 /**
- * Delete a custom scanned dish
+ * Delete a custom scanned dish from MongoDB
  */
-export function deleteCustomDish(req, res) {
-  const { id } = req.params;
-  let dishes = readCustomDishes();
-  const initialLength = dishes.length;
-  dishes = dishes.filter((d) => d.id !== id);
+export async function deleteCustomDish(req, res) {
+  try {
+    const { id } = req.params;
+    const deleted = await Dish.findOneAndDelete({ id, isCustom: true });
 
-  if (dishes.length === initialLength) {
-    return res.status(404).json({ success: false, message: 'Custom dish not found.' });
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Custom dish not found in database.' });
+    }
+
+    return res.status(200).json({ success: true, message: `Dish '${deleted.name}' deleted from MongoDB successfully.` });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to delete dish from MongoDB',
+      error: err.message
+    });
   }
-
-  writeCustomDishes(dishes);
-  return res.status(200).json({ success: true, message: 'Dish deleted successfully.' });
 }
