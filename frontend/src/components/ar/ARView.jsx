@@ -265,7 +265,7 @@ const ARView = forwardRef(function ARView({ dish, onBack, onOpenDetails, autoLau
   // Launch Google SceneViewer if user explicitly desires external native plane tracking
   const handleLaunchExternalGoogleAR = async () => {
     setIsLaunchingNativeAR(true);
-    setInstruction('🚀 Launching Google ARCore SceneViewer...');
+    setInstruction('🚀 Launching Tabletop AR Camera...');
     
     // 1. Immediately terminate in-app WebRTC video stream
     stopCamera();
@@ -594,18 +594,21 @@ const ARView = forwardRef(function ARView({ dish, onBack, onOpenDetails, autoLau
             </button>
           )}
 
-          {/* Optional Launch Google SceneViewer button */}
+          {/* Native Room AR Camera button */}
           <button
             type="button"
             className="btn-sceneviewer-trigger"
             onClick={handleLaunchExternalGoogleAR}
             disabled={isLaunchingNativeAR}
-            title="Open in native Google Play Services AR"
+            title="View in Immersive Tabletop AR"
           >
             {isLaunchingNativeAR ? (
               <Loader2 size={16} className="spin" />
             ) : (
-              <span>Google ARCore</span>
+              <>
+                <Sparkles size={15} />
+                <span>Tabletop AR</span>
+              </>
             )}
           </button>
 

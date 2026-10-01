@@ -64,7 +64,7 @@ export async function createScannedDish(req, res) {
         console.warn('[ScanController] Video AI processing error:', aiErr.message);
         return res.status(503).json({
           success: false,
-          message: `The 3D AI generator is currently busy or queued (${aiErr.message}). You can also download a .glb model from Meshy and upload it directly!`,
+          message: `The 3D model generator is currently busy (${aiErr.message}). You can also upload a 3D .glb model directly!`,
           error: aiErr.message
         });
       } finally {
@@ -82,7 +82,7 @@ export async function createScannedDish(req, res) {
         console.warn('[ScanController] AI Space busy or queue full:', aiErr.message);
         return res.status(503).json({
           success: false,
-          message: `The 3D AI generator is currently busy or queued (${aiErr.message}). You can also download a .glb model from Meshy and upload it directly!`,
+          message: `The 3D model generator is currently busy (${aiErr.message}). You can also upload a 3D .glb model directly!`,
           error: aiErr.message
         });
       }
@@ -199,7 +199,7 @@ export function getUploadSignature(req, res) {
     if (!apiSecret || !apiKey || !cloudName) {
       return res.status(500).json({
         success: false,
-        error: 'Cloudinary environment variables (CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_CLOUD_NAME) are not configured in Vercel settings.'
+        error: 'Cloud media storage service is currently unconfigured or unavailable.'
       });
     }
 

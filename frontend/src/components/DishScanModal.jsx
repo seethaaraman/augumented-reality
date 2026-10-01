@@ -114,7 +114,7 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
       } else if (mode === 'photo') {
         setProgressMsg('Uploading photo to 3D AI generator...');
       } else {
-        setProgressMsg('Requesting Cloudinary upload signature...');
+        setProgressMsg('Preparing secure 3D asset upload...');
       }
 
       let createdDish = null;
@@ -135,7 +135,7 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
         const sigJson = await sigRes.json().catch(() => ({}));
 
         if (!sigRes.ok || !sigJson.success || !sigJson.data) {
-          throw new Error(sigJson.error || 'Could not get Cloudinary signature. Please verify Vercel environment variables.');
+          throw new Error(sigJson.error || 'Could not initialize secure upload. Please check connection and try again.');
         }
 
         const sig = sigJson.data;
@@ -146,7 +146,7 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
         cloudForm.append('signature', sig.signature);
         cloudForm.append('folder', sig.folder);
 
-        setProgressMsg('Uploading 3D model directly to Cloudinary CDN...');
+        setProgressMsg('Uploading 3D model to High-Speed Cloud CDN...');
         const cloudUploadRes = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/raw/upload`, {
           method: 'POST',
           body: cloudForm
@@ -154,15 +154,15 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
 
         if (!cloudUploadRes.ok) {
           const cloudErr = await cloudUploadRes.json().catch(() => ({}));
-          throw new Error(cloudErr.error?.message || 'Direct upload to Cloudinary failed.');
+          throw new Error(cloudErr.error?.message || '3D model cloud upload failed.');
         }
 
         const cloudData = await cloudUploadRes.json();
         if (!cloudData.secure_url) {
-          throw new Error('Cloudinary did not return a valid 3D model URL.');
+          throw new Error('Server did not return a valid 3D asset URL.');
         }
 
-        setProgressMsg('Saving dish in MongoDB Atlas...');
+        setProgressMsg('Adding 3D dish to restaurant menu...');
         const saveRes = await fetch(`${getApiBase()}/scan/save`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -181,7 +181,7 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
 
         const saveJson = await saveRes.json().catch(() => ({}));
         if (!saveRes.ok || !saveJson.success) {
-          throw new Error(saveJson.error || saveJson.message || 'Failed to save dish in MongoDB Atlas.');
+          throw new Error(saveJson.error || saveJson.message || 'Failed to save dish to restaurant menu.');
         }
         createdDish = saveJson.data;
       } else {
@@ -233,7 +233,7 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
       console.error('[DishScanModal] Error:', err);
       setStatus('error');
       const friendlyMsg = err.message === 'Failed to fetch'
-        ? 'Network request failed ("Failed to fetch"). Please check internet connection and ensure Vercel environment variables are configured.'
+        ? 'Network request timed out. Please check your internet connection and try again.'
         : err.message || 'Something went wrong while processing the scan.';
       setErrorMsg(friendlyMsg);
     }
@@ -262,11 +262,11 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
           <div>
             <div className="brand-badge" style={{ marginBottom: '6px' }}>
               <Sparkles size={12} />
-              AI 3D Scan & Cloudinary
+              3D Dish Studio
             </div>
             <h2 className="scan-modal-title">Scan & Add 3D Dish</h2>
             <p className="scan-modal-subtitle">
-              Convert food photos or 360° videos into interactive 3D models stored on Cloudinary for AR dining.
+              Convert food photos, 360° videos, or 3D models into interactive dining presentations for AR.
             </p>
           </div>
           <button className="scan-modal-close" onClick={onClose} aria-label="Close">
@@ -284,7 +284,7 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
               {scannedResult.name} is Ready!
             </h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', marginTop: '4px' }}>
-              3D Model uploaded to Cloudinary & added to your live menu.
+              3D Model is ready and active on your live dining menu.
             </p>
 
             {/* Model Preview */}
@@ -400,7 +400,7 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
                       ? 'Circle slowly around plate (5–15 sec video)'
                       : mode === 'photo'
                       ? 'Single clear photo (good lighting, matte table)'
-                      : 'GLB 3D model from Meshy / Sketchfab'}
+                      : 'Standard 3D model (.glb) file'}
                   </p>
                 </div>
               )}
@@ -516,7 +516,7 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
                       ? 'Process 360° Video'
                       : mode === 'photo'
                       ? 'Scan & Generate 3D Dish'
-                      : 'Upload to Cloudinary'}
+                      : 'Add 3D Dish to Menu'}
                   </>
                 )}
               </button>

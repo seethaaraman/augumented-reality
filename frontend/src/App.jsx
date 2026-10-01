@@ -211,7 +211,7 @@ export default function App() {
         />
       )}
 
-      {/* 3D Scan & Cloudinary Add Dish Modal */}
+      {/* 3D Scan & Add Dish Studio Modal */}
       <DishScanModal
         isOpen={isScanModalOpen}
         onClose={() => setIsScanModalOpen(false)}
