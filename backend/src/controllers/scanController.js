@@ -204,3 +204,99 @@ export async function deleteCustomDish(req, res) {
     });
   }
 }
+
+/**
+ * Generates signature for direct client-to-Cloudinary upload (bypasses serverless payload limits).
+ */
+export function getUploadSignature(req, res) {
+  try {
+    const timestamp = Math.round(new Date().getTime() / 1000);
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+
+    const signature = cloudinary.utils.api_sign_request(
+      { timestamp, folder: 'ar_dish_models' },
+      apiSecret
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        timestamp,
+        signature,
+        apiKey,
+        cloudName,
+        folder: 'ar_dish_models'
+      }
+    });
+  } catch (err) {
+    console.error('[ScanController] Signature error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+/**
+ * Saves dish metadata to MongoDB when client has already uploaded model directly to Cloudinary.
+ */
+export async function saveScannedDishMetadata(req, res) {
+  try {
+    const {
+      name = 'Scanned Dish',
+      tagline = 'Freshly Scanned Delicacy',
+      price = '₹290',
+      dietary = 'Vegetarian',
+      spiceLevel = '🌶️ Medium Spice',
+      calories = '420 kcal',
+      prepTime = '15 mins',
+      description = 'Freshly scanned 3D delicacy served in immersive Augmented Reality.',
+      ingredients = 'Fresh Organic Ingredients, Chef Spices',
+      modelUrl
+    } = req.body;
+
+    if (!modelUrl) {
+      return res.status(400).json({ success: false, message: 'modelUrl is required' });
+    }
+
+    const dishSlug = slugify(name);
+    const numericPrice = parseInt(String(price).replace(/[^0-9]/g, '')) || 290;
+    const ingredientsList = typeof ingredients === 'string'
+      ? ingredients.split(',').map((s) => s.trim()).filter(Boolean)
+      : ['Fresh Farm Ingredients', 'Artisanal Spices'];
+
+    const dishData = {
+      id: `custom-${dishSlug}-${Date.now().toString().slice(-4)}`,
+      name,
+      tagline,
+      price: price.startsWith('₹') ? price : `₹${price}`,
+      numericPrice,
+      spiceLevel,
+      spiceScore: spiceLevel.includes('🌶️🌶️') ? 3 : 1,
+      rating: '5.0 ★ (New)',
+      prepTime,
+      calories,
+      description,
+      ingredients: ingredientsList,
+      dietary,
+      badge: '✨ 3D SCANNED',
+      isARAvailable: true,
+      modelUrl,
+      remoteModelUrl: modelUrl,
+      colorAccent: dietary === 'Vegetarian' ? '#10b981' : '#f59e0b',
+      isCustom: true
+    };
+
+    const newDish = await Dish.create(dishData);
+    writeCustomDishesBackup(newDish.toJSON());
+
+    console.log(`🍃 [ScanController] Direct dish metadata saved in MongoDB: ${newDish.name}`);
+    return res.status(201).json({
+      success: true,
+      message: '3D Dish successfully added to MongoDB!',
+      data: newDish
+    });
+  } catch (err) {
+    console.error('[ScanController] Save metadata error:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}

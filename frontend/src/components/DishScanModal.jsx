@@ -91,23 +91,84 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
         }, 3000);
       }
 
-      const res = await fetch(`${getApiBase()}/scan/dish`, {
-        method: 'POST',
-        body: formData
-      });
+      let createdDish = null;
 
-      const data = await res.json();
+      // 1. Direct Cloudinary upload for .glb models (bypasses Vercel 4.5MB serverless payload limit)
+      if (mode === 'glb') {
+        setProgressMsg('Uploading 3D model directly to Cloudinary CDN...');
+        try {
+          const sigRes = await fetch(`${getApiBase()}/scan/signature`);
+          if (sigRes.ok) {
+            const sigJson = await sigRes.json();
+            if (sigJson.success && sigJson.data) {
+              const sig = sigJson.data;
+              const cloudForm = new FormData();
+              cloudForm.append('file', file);
+              cloudForm.append('api_key', sig.apiKey);
+              cloudForm.append('timestamp', sig.timestamp);
+              cloudForm.append('signature', sig.signature);
+              cloudForm.append('folder', sig.folder);
 
-      if (!res.ok || !data.success) {
-        throw new Error(data.message || 'Failed to process dish scan.');
+              const cloudUploadRes = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/raw/upload`, {
+                method: 'POST',
+                body: cloudForm
+              });
+
+              if (cloudUploadRes.ok) {
+                const cloudData = await cloudUploadRes.json();
+                if (cloudData.secure_url) {
+                  setProgressMsg('Registering dish in MongoDB Atlas...');
+                  const saveRes = await fetch(`${getApiBase()}/scan/save`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      name,
+                      tagline: tagline || `${name} Special`,
+                      price,
+                      dietary,
+                      spiceLevel,
+                      calories,
+                      prepTime,
+                      description: description || 'Freshly scanned 3D delicacy served in immersive Augmented Reality.',
+                      modelUrl: cloudData.secure_url
+                    })
+                  });
+
+                  if (saveRes.ok) {
+                    const saveJson = await saveRes.json();
+                    if (saveJson.success && saveJson.data) {
+                      createdDish = saveJson.data;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        } catch (directErr) {
+          console.warn('[DishScanModal] Direct Cloudinary upload fallback to standard upload:', directErr.message);
+        }
+      }
+
+      // 2. Standard server-side upload fallback if direct upload didn't run or wasn't glb
+      if (!createdDish) {
+        const res = await fetch(`${getApiBase()}/scan/dish`, {
+          method: 'POST',
+          body: formData
+        });
+
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.message || 'Failed to process dish scan.');
+        }
+        createdDish = data.data;
       }
 
       setStatus('success');
       setProgressMsg('3D Dish successfully created and hosted!');
-      setScannedResult(data.data);
+      setScannedResult(createdDish);
 
       if (onDishAdded) {
-        onDishAdded(data.data);
+        onDishAdded(createdDish);
       }
     } catch (err) {
       console.error('[DishScanModal] Error:', err);

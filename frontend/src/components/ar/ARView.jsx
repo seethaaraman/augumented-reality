@@ -243,12 +243,19 @@ const ARView = forwardRef(function ARView({ dish, onBack, onOpenDetails, autoLau
     setIsLaunchingNativeAR(true);
     setInstruction('🚀 Launching Google ARCore SceneViewer...');
     stopCamera();
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     try {
+      if (modelViewerRef.current && typeof modelViewerRef.current.activateAR === 'function') {
+        try {
+          await modelViewerRef.current.activateAR();
+          return;
+        } catch (_) {}
+      }
       await launchRealARCamera(dish, placementMode);
     } catch (err) {
       console.warn('[ARView] SceneViewer launch:', err);
+      await launchRealARCamera(dish, placementMode);
     } finally {
       setTimeout(() => setIsLaunchingNativeAR(false), 2000);
     }

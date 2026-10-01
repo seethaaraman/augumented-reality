@@ -2,7 +2,13 @@ import { Router } from 'express';
 import multer from 'multer';
 import os from 'os';
 import path from 'path';
-import { createScannedDish, getCustomDishes, deleteCustomDish } from '../controllers/scanController.js';
+import {
+  createScannedDish,
+  getCustomDishes,
+  deleteCustomDish,
+  getUploadSignature,
+  saveScannedDishMetadata
+} from '../controllers/scanController.js';
 
 const router = Router();
 
@@ -16,6 +22,8 @@ const upload = multer({
 
 // Routes
 router.post('/dish', upload.single('file'), createScannedDish);
+router.get('/signature', getUploadSignature);
+router.post('/save', saveScannedDishMetadata);
 router.get('/custom-dishes', getCustomDishes);
 router.delete('/custom-dish/:id', deleteCustomDish);
 
