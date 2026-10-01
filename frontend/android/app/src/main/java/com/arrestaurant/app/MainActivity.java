@@ -45,7 +45,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    protected void onPause() {
+    public void onPause() {
         super.onPause();
         // Pause WebView to cleanly release camera hardware locks when opening SceneViewer or backgrounding
         if (getBridge() != null && getBridge().getWebView() != null) {
@@ -54,7 +54,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
         if (getBridge() != null && getBridge().getWebView() != null) {
             getBridge().getWebView().onResume();
