@@ -274,7 +274,8 @@ const ARView = forwardRef(function ARView({ dish, onBack, onOpenDetails, autoLau
         autoPlay
         playsInline
         muted
-        className={`ar-live-video ${isCameraActive ? 'visible' : 'hidden'}`}
+        style={{ display: isCameraActive ? 'block' : 'none' }}
+        className={`ar-live-video-stream ${isCameraActive ? 'visible' : 'hidden'}`}
       />
 
       {/* Snapshot Flash Overlay */}

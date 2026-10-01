@@ -730,6 +730,7 @@ body {
 }
 
 /* Live Camera Video Stream Layer */
+.ar-live-video,
 .ar-live-video-stream {
   position: absolute;
   top: 0;
@@ -740,16 +741,20 @@ body {
   z-index: 1;
   pointer-events: none;
   transition: opacity 0.3s ease;
+  display: none;
 }
 
+.ar-live-video.visible,
 .ar-live-video-stream.visible {
   opacity: 1;
-  display: block;
+  display: block !important;
 }
 
+.ar-live-video.hidden,
 .ar-live-video-stream.hidden {
   opacity: 0;
-  display: none;
+  display: none !important;
+  visibility: hidden;
 }
 
 /* Transparent Canvas for Live AR */
