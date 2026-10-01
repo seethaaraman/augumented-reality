@@ -11,7 +11,7 @@ export function getApiBase() {
   if (Capacitor.isNativePlatform()) {
     // When running inside the Android APK on a device:
     // Uses the public cloud Vercel URL so the mobile app works on 4G, 5G, and any Wi-Fi
-    return 'https://augumented-reality.vercel.app/api';
+    return 'https://augumented-reality-zob6.vercel.app/api';
   }
 
   // Running in browser locally or on Vercel web

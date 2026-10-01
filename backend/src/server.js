@@ -22,4 +22,9 @@ async function startServer() {
   });
 }
 
-startServer();
+// Only listen directly when running standalone (not in Vercel serverless environment)
+if (!process.env.VERCEL) {
+  startServer();
+}
+
+export default app;

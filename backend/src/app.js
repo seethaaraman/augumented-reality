@@ -19,19 +19,26 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
+// Normalize URL path when running behind Vercel serverless rewrites
+app.use((req, res, next) => {
+  const matchedPath = req.headers['x-matched-path'];
+  if (matchedPath && !matchedPath.includes('index.js') && !matchedPath.includes('server.js')) {
+    req.url = matchedPath;
+  }
+  next();
+});
+
 // Serverless DB connection middleware (ensures DB is active for every serverless request)
 let isDbInitialized = false;
 app.use(async (req, res, next) => {
-  if (req.path.startsWith('/api') || req.url.startsWith('/api')) {
-    try {
-      if (!isDbInitialized || mongoose.connection.readyState !== 1) {
-        await connectDB();
-        await seedDatabaseIfEmpty();
-        isDbInitialized = true;
-      }
-    } catch (err) {
-      console.warn('[DB Middleware] Database connection warning:', err.message);
+  try {
+    if (!isDbInitialized || mongoose.connection.readyState !== 1) {
+      await connectDB();
+      await seedDatabaseIfEmpty();
+      isDbInitialized = true;
     }
+  } catch (err) {
+    console.warn('[DB Middleware] Database connection warning:', err.message);
   }
   next();
 });
@@ -40,13 +47,18 @@ app.use(async (req, res, next) => {
 const modelsPath = path.resolve(__dirname, '../models');
 app.use('/models', express.static(modelsPath));
 
-// API Routes
+// API Routes (mounted under both /api/* and root paths for Vercel Services compatibility)
 app.use('/api/menu', menuRoutes);
+app.use('/menu', menuRoutes);
+
 app.use('/api/orders', orderRoutes);
+app.use('/orders', orderRoutes);
+
 app.use('/api/scan', scanRoutes);
+app.use('/scan', scanRoutes);
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
+const handleHealth = (req, res) => {
   const dbStatus = mongoose.connection.readyState === 1 ? 'CONNECTED' : 'DISCONNECTED';
   res.status(200).json({
     status: 'ONLINE',
@@ -61,7 +73,10 @@ app.get('/api/health', (req, res) => {
     environment: process.env.VERCEL ? 'Vercel Serverless' : 'Node Server',
     timestamp: new Date().toISOString()
   });
-});
+};
+
+app.get('/api/health', handleHealth);
+app.get('/health', handleHealth);
 
 // Root welcome route
 app.get('/', (req, res) => {
