@@ -111,32 +111,40 @@ public class MainActivity extends BridgeActivity {
                     "&mode=ar_preferred&resizable=true&disable_occlusion=true&" + verticalParam + "&title=" +
                     Uri.encode(safeTitle);
 
-            // 1. Primary: Google App (com.google.android.googlequicksearchbox) which hosts Google SceneViewer UI
-            Intent quickSearchIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
-            quickSearchIntent.setPackage("com.google.android.googlequicksearchbox");
-            quickSearchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            // Delay intent launch slightly (250ms) to guarantee WebView Camera2 HAL lock is fully released by Android OS
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    // 1. Primary: Google App (com.google.android.googlequicksearchbox) which hosts Google SceneViewer UI
+                    Intent quickSearchIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
+                    quickSearchIntent.setPackage("com.google.android.googlequicksearchbox");
+                    quickSearchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-            if (quickSearchIntent.resolveActivity(getPackageManager()) != null) {
-                Log.d(TAG, "Launching SceneViewer via Google App");
-                startActivity(quickSearchIntent);
-                return true;
-            }
+                    if (quickSearchIntent.resolveActivity(getPackageManager()) != null) {
+                        Log.d(TAG, "Launching SceneViewer via Google App");
+                        startActivity(quickSearchIntent);
+                        return;
+                    }
 
-            // 2. Google Chrome
-            Intent chromeIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
-            chromeIntent.setPackage("com.android.chrome");
-            chromeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    // 2. Google Chrome
+                    Intent chromeIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
+                    chromeIntent.setPackage("com.android.chrome");
+                    chromeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
-            if (chromeIntent.resolveActivity(getPackageManager()) != null) {
-                Log.d(TAG, "Launching SceneViewer via Chrome");
-                startActivity(chromeIntent);
-                return true;
-            }
+                    if (chromeIntent.resolveActivity(getPackageManager()) != null) {
+                        Log.d(TAG, "Launching SceneViewer via Chrome");
+                        startActivity(chromeIntent);
+                        return;
+                    }
 
-            // 3. System Default AR Handler
-            Intent defaultBrowserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
-            defaultBrowserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            startActivity(defaultBrowserIntent);
+                    // 3. System Default AR Handler
+                    Intent defaultBrowserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(httpsUri));
+                    defaultBrowserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    startActivity(defaultBrowserIntent);
+                } catch (Exception ex) {
+                    Log.e(TAG, "Delayed SceneViewer launch error: " + ex.getMessage(), ex);
+                }
+            }, 250);
+
             return true;
 
         } catch (Exception e) {

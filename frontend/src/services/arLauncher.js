@@ -111,8 +111,8 @@ export async function launchRealARCamera(dish, placementMode = 'floor') {
     const verticalParam = isWall ? 'enable_vertical_placement=true' : 'enable_vertical_placement=false';
     const httpsFallback = `https://arvr.google.com/scene-viewer/1.0?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&${verticalParam}&title=${encodedTitle}`;
     
-    // Explicit Intent to Google Play Services for AR (ARCore) with browser fallback
-    const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.0?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&${verticalParam}&title=${encodedTitle}#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(httpsFallback)};end;`;
+    // Explicit Intent to Google SceneViewer (hosted inside Google App) with browser fallback
+    const sceneViewerIntent = `intent://arvr.google.com/scene-viewer/1.0?file=${encodedGlb}&mode=ar_preferred&resizable=true&disable_occlusion=true&${verticalParam}&title=${encodedTitle}#Intent;scheme=https;package=com.google.android.googlequicksearchbox;action=android.intent.action.VIEW;S.browser_fallback_url=${encodeURIComponent(httpsFallback)};end;`;
     
     try {
       const link = document.createElement('a');

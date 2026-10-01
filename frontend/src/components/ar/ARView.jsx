@@ -238,12 +238,40 @@ const ARView = forwardRef(function ARView({ dish, onBack, onOpenDetails, autoLau
     }
   };
 
+  // Auto-scale model on load to fit realistic dining table proportions (25cm)
+  const handleModelLoad = () => {
+    setIsModelLoaded(true);
+    if (!modelViewerRef.current) return;
+
+    try {
+      const dims = modelViewerRef.current.getDimensions();
+      if (dims && dims.x > 0 && dims.y > 0 && dims.z > 0) {
+        const maxDim = Math.max(dims.x, dims.y, dims.z);
+        const TARGET_SIZE = placementMode === 'wall' ? 0.35 : 0.25;
+
+        // Auto-scale if model is excessively large or small
+        if (maxDim > 0.38 || maxDim < 0.08) {
+          const factor = (TARGET_SIZE / maxDim);
+          const s = Number(factor.toFixed(5));
+          modelViewerRef.current.scale = `${s} ${s} ${s}`;
+          console.log(`🎯 [ARView] Auto-scaled dish model from ${maxDim.toFixed(2)}m to ${(maxDim * s).toFixed(2)}m (scale: ${s})`);
+        }
+      }
+    } catch (scaleErr) {
+      console.warn('[ARView] Auto-scale calculation warning:', scaleErr);
+    }
+  };
+
   // Launch Google SceneViewer if user explicitly desires external native plane tracking
   const handleLaunchExternalGoogleAR = async () => {
     setIsLaunchingNativeAR(true);
     setInstruction('🚀 Launching Google ARCore SceneViewer...');
+    
+    // 1. Immediately terminate in-app WebRTC video stream
     stopCamera();
-    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // 2. Allow Android Camera2 HAL 700ms to cleanly release camera hardware session
+    await new Promise((resolve) => setTimeout(resolve, 700));
 
     try {
       if (modelViewerRef.current && typeof modelViewerRef.current.activateAR === 'function') {
@@ -373,7 +401,7 @@ const ARView = forwardRef(function ARView({ dish, onBack, onOpenDetails, autoLau
         auto-rotate-delay="3000"
         rotation-per-second="14deg"
         className={`model-viewer-viewport ${isLayerMode ? 'exploded-visual' : ''} ${isCameraActive ? 'transparent-ar' : ''}`}
-        onLoad={() => setIsModelLoaded(true)}
+        onLoad={handleModelLoad}
       >
         {/* Custom Loading Poster Slot */}
         <div slot="poster" className="model-viewer-poster">

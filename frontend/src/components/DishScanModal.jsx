@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload, Camera, Video, Sparkles, Check, AlertCircle, Loader2, Box, Eye, Flame } from 'lucide-react';
 import { getApiBase } from '../services/api';
+import { normalizeGlbScale } from '../utils/modelNormalizer';
 
 async function compressImageIfNeeded(file) {
   if (!file || !file.type.startsWith('image/')) return file;
@@ -120,6 +121,15 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
 
       // 1. Direct Cloudinary upload for .glb models (bypasses Vercel 4.5MB serverless payload limit)
       if (mode === 'glb') {
+        setProgressMsg('Optimizing & scaling 3D model for dining table proportions...');
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const normalizedBuffer = normalizeGlbScale(arrayBuffer, 0.25);
+          uploadFile = new File([normalizedBuffer], file.name, { type: 'model/gltf-binary' });
+        } catch (normErr) {
+          console.warn('[DishScanModal] GLB pre-scale warning:', normErr);
+        }
+
         setProgressMsg('Getting upload signature from backend...');
         const sigRes = await fetch(`${getApiBase()}/scan/signature`);
         const sigJson = await sigRes.json().catch(() => ({}));
