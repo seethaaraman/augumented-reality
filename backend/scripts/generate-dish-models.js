@@ -490,8 +490,8 @@ async function run() {
   await createBiryani();
   await normalizeCake();
 
-  console.log('\n🔍 Verifying all 5 models for AR tabletop grounding and dimensions:');
-  const models = ['biryani.glb', 'cake.glb', 'butter-chicken.glb', 'paneer-tikka.glb', 'lime-soda.glb'];
+  console.log('\n🔍 Verifying all 7 models for AR tabletop grounding and dimensions:');
+  const models = ['biryani.glb', 'cake.glb', 'butter-chicken.glb', 'paneer-tikka.glb', 'lime-soda.glb', 'celebration-cake.glb', 'cold-brew-flask.glb'];
   const loader = new GLTFLoader();
 
   for (const m of models) {

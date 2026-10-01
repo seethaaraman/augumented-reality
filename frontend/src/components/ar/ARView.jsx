@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { ArrowLeft, RotateCcw, Camera, Info, Sparkles, Loader2, Utensils, Layers, Grid, Square, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import '@google/model-viewer';
 import { launchRealARCamera, getPublicModelUrl } from '../../services/arLauncher';
@@ -28,7 +28,7 @@ function getDishLayers(dish) {
       name: 'Simmered Base & Foundation',
       position: '0 0.01 0',
       cameraTarget: '0 0.02m 0',
-      cameraOrbit: '0deg 75deg 90%',
+      cameraOrbit: '0deg 75deg 95%',
       color: '#10b981',
       description: 'Slow-simmered foundation delivering rich aroma, deep savory warmth, and grounding culinary texture.',
       ingredients: baseIngredients
@@ -40,7 +40,7 @@ function getDishLayers(dish) {
       name: 'Infused Protein & Core Elements',
       position: '0 0.06 0',
       cameraTarget: '0 0.06m 0',
-      cameraOrbit: '45deg 70deg 85%',
+      cameraOrbit: '45deg 70deg 90%',
       color: '#f59e0b',
       description: 'Tender marinated core infused with authentic slow-cooked spices and velvety culinary richness.',
       ingredients: midIngredients
@@ -52,9 +52,9 @@ function getDishLayers(dish) {
       name: 'Aromatics, Glaze & Garnish',
       position: '0 0.13 0',
       cameraTarget: '0 0.12m 0',
-      cameraOrbit: '90deg 60deg 80%',
+      cameraOrbit: '90deg 60deg 85%',
       color: '#ec4899',
-      description: 'Delicate finishing layer featuring hand-painted botanical glaze, crispy aromatics, and fresh herbs.',
+      description: 'Delicate finishing layer featuring hand-painted glaze, crispy aromatics, and fresh toppings.',
       ingredients: topIngredients
     }
   ];
@@ -65,8 +65,9 @@ function getDishLayers(dish) {
  * - Table/Floor & Vertical Wall Surface Detection
  * - Interactive 3D Exploded / Deconstructed Layer Inspector
  * - Real-time 3D Hotspot Tracking
+ * - Responsive Mobile Bottom Sheet & Single-Row Top HUD
  */
-export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false }) {
+const ARView = forwardRef(function ARView({ dish, onBack, onOpenDetails, autoLaunch = false, onLayerModeChange }, ref) {
   const modelViewerRef = useRef(null);
   const videoRef = useRef(null);
   const hasAutoLaunchedRef = useRef(false);
@@ -83,12 +84,25 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
 
   // Interactive Layer Explode Mode
   const [isLayerMode, setIsLayerMode] = useState(false);
-  const [activeLayerIndex, setActiveLayerIndex] = useState(null);
+  const [activeLayerIndex, setActiveLayerIndex] = useState(0);
 
   const [instruction, setInstruction] = useState('🪑 Ground Mount Active: Point camera at dining table or floor');
 
   const layers = getDishLayers(dish);
-  const activeModelUrl = getPublicModelUrl(dish);
+  const activeModelUrl = dish?.modelUrl || getPublicModelUrl(dish);
+
+  // Expose collapseLayerMode imperative handle for phone back gesture
+  useImperativeHandle(ref, () => ({
+    collapseLayerMode: () => {
+      if (isLayerMode) {
+        setIsLayerMode(false);
+        if (onLayerModeChange) onLayerModeChange(false);
+        handleResetCamera();
+        return true;
+      }
+      return false;
+    }
+  }));
 
   // Start in-app real camera stream
   const startCamera = async () => {
@@ -129,24 +143,28 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
     }
   };
 
-  // Stop camera tracks on unmount or mode switch
+  // Stop camera cleanly
   const stopCamera = () => {
     if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = videoRef.current.srcObject.getTracks();
+      const stream = videoRef.current.srcObject;
+      const tracks = stream.getTracks();
       tracks.forEach((track) => track.stop());
       videoRef.current.srcObject = null;
     }
     setIsCameraActive(false);
+    setInstruction('✨ 3D Studio Mode: Drag to rotate • Pinch to zoom • Tap Surface to switch mounts');
   };
 
+  // Auto-launch camera when navigated directly from menu
   useEffect(() => {
-    // Automatically start live camera feed when entering AR mode
-    startCamera();
-
+    if (autoLaunch && !hasAutoLaunchedRef.current) {
+      hasAutoLaunchedRef.current = true;
+      startCamera();
+    }
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [autoLaunch]);
 
   const handleTogglePlacement = (forcedMode) => {
     const nextMode = forcedMode || (placementMode === 'floor' ? 'wall' : 'floor');
@@ -155,13 +173,13 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
     if (nextMode === 'wall') {
       setInstruction('🧱 Wall Mount Active: Dish oriented flush against wall');
       if (modelViewerRef.current) {
-        modelViewerRef.current.cameraOrbit = '0deg 90deg 100%';
+        modelViewerRef.current.cameraOrbit = '0deg 90deg 110%';
         modelViewerRef.current.cameraTarget = '0 0.05m 0';
       }
     } else {
       setInstruction('🪑 Ground Mount Active: Dish positioned horizontally on table');
       if (modelViewerRef.current) {
-        modelViewerRef.current.cameraOrbit = '0deg 70deg 105%';
+        modelViewerRef.current.cameraOrbit = '0deg 75deg 120%';
         modelViewerRef.current.cameraTarget = 'auto auto auto';
       }
     }
@@ -170,29 +188,32 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
   const handleResetCamera = () => {
     if (modelViewerRef.current) {
       if (placementMode === 'wall') {
-        modelViewerRef.current.cameraOrbit = '0deg 90deg 100%';
+        modelViewerRef.current.cameraOrbit = '0deg 90deg 110%';
         modelViewerRef.current.cameraTarget = '0 0.05m 0';
       } else {
-        modelViewerRef.current.cameraOrbit = '0deg 70deg 105%';
+        modelViewerRef.current.cameraOrbit = '0deg 75deg 120%';
         modelViewerRef.current.cameraTarget = 'auto auto auto';
       }
       modelViewerRef.current.fieldOfView = 'auto';
     }
-    setActiveLayerIndex(null);
+    setActiveLayerIndex(0);
     setInstruction('🔄 Alignment and view reset successfully');
   };
 
   const handleToggleLayerMode = () => {
     const nextState = !isLayerMode;
     setIsLayerMode(nextState);
+    if (onLayerModeChange) onLayerModeChange(nextState);
+
     if (nextState) {
-      setActiveLayerIndex(1);
-      setInstruction('✨ 3D Layers Exploded: Tap glowing hotspots on dish');
+      setActiveLayerIndex(0);
+      setInstruction('✨ 3D Layers Exploded: Tap glowing hotspots on dish or select tabs below');
       if (modelViewerRef.current) {
-        modelViewerRef.current.cameraOrbit = '30deg 65deg 90%';
+        modelViewerRef.current.cameraOrbit = '25deg 65deg 105%';
+        modelViewerRef.current.cameraTarget = '0 0.08m 0';
       }
     } else {
-      setActiveLayerIndex(null);
+      setActiveLayerIndex(0);
       handleResetCamera();
       setInstruction(
         placementMode === 'wall'
@@ -200,6 +221,12 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
           : '🪑 Ground Mount: Point camera at dining table or floor'
       );
     }
+  };
+
+  const handleCollapseLayers = () => {
+    setIsLayerMode(false);
+    if (onLayerModeChange) onLayerModeChange(false);
+    handleResetCamera();
   };
 
   const handleSelectLayer = (index) => {
@@ -215,11 +242,7 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
   const handleLaunchExternalGoogleAR = async () => {
     setIsLaunchingNativeAR(true);
     setInstruction('🚀 Launching Google ARCore SceneViewer...');
-
-    // CRITICAL: Release the in-app camera hardware lock so Google ARCore can acquire the camera
     stopCamera();
-
-    // Give Android Camera HAL 500ms to cleanly release camera sensor lock
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     try {
@@ -241,6 +264,8 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
     onBack();
   };
 
+  const activeLayer = layers[activeLayerIndex] || layers[0];
+
   return (
     <div className={`ar-screen-container ${isLayerMode ? 'layer-mode-active' : ''} ${isCameraActive ? 'camera-view-active' : ''}`}>
       {/* 1. Live Camera Feed Layer (Underneath 3D Model) */}
@@ -249,88 +274,73 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
         autoPlay
         playsInline
         muted
-        className={`ar-live-video-stream ${isCameraActive ? 'visible' : 'hidden'}`}
+        className={`ar-live-video ${isCameraActive ? 'visible' : 'hidden'}`}
       />
 
-      {/* Snapshot flash effect */}
-      {snapshotTaken && <div className="ar-snapshot-flash" />}
+      {/* Snapshot Flash Overlay */}
+      {snapshotTaken && <div className="snapshot-flash-overlay" />}
 
-      {/* 2. Visual Alignment Reticle in Live Camera */}
-      {isCameraActive && (
-        <div className={`ar-surface-reticle ${placementMode === 'wall' ? 'reticle-wall' : 'reticle-ground'}`}>
-          <div className="reticle-pulse-ring" />
-          <div className="reticle-crosshair-center" />
-          <div className="reticle-label">
-            {placementMode === 'wall' ? '🧱 WALL MOUNT SURFACE' : '🪑 DINING TABLE SURFACE'}
-          </div>
-        </div>
-      )}
-
-      {/* 3. IN-CAMERA TOP FLOATING HUD BAR (Always on top of camera) */}
-      <div className="in-camera-live-hud">
+      {/* 2. Top HUD Bar (Single Row, Mobile Responsive) */}
+      <div className="camera-top-hud">
         <div className="in-camera-top-bar">
-          {/* Left Controls: Menu & Reset */}
-          <div className="camera-hud-group">
-            <button
-              type="button"
-              className="camera-hud-btn"
-              onClick={handleClose}
-              title="Return to Restaurant Menu"
-            >
-              <ArrowLeft size={16} />
-              <span>Menu</span>
-            </button>
+          {/* Back to Menu */}
+          <button
+            type="button"
+            className="camera-hud-btn hud-back-btn"
+            onClick={handleClose}
+            title="Return to Menu"
+          >
+            <ArrowLeft size={16} />
+            <span className="btn-label-text">Menu</span>
+          </button>
 
+          {/* Mount Surface Selection (Ground vs Wall) Segmented Switch */}
+          <div className="hud-surface-segmented" role="group" aria-label="Surface Mount Mode">
             <button
               type="button"
-              className="camera-hud-btn reset-btn"
+              className={`hud-segment-btn ${placementMode === 'floor' ? 'active' : ''}`}
+              onClick={() => handleTogglePlacement('floor')}
+              title="Table / Ground Mount"
+            >
+              <Grid size={13} />
+              <span>Ground</span>
+            </button>
+            <button
+              type="button"
+              className={`hud-segment-btn ${placementMode === 'wall' ? 'active' : ''}`}
+              onClick={() => handleTogglePlacement('wall')}
+              title="Vertical Wall Mount"
+            >
+              <Square size={13} />
+              <span>Wall</span>
+            </button>
+          </div>
+
+          {/* Right Action Buttons: Reset & Explode/Collapse */}
+          <div className="hud-actions-group">
+            <button
+              type="button"
+              className="camera-hud-btn hud-icon-btn reset-btn"
               onClick={handleResetCamera}
               title="Reset Alignment & Orientation"
             >
               <RotateCcw size={15} />
-              <span>Reset</span>
-            </button>
-          </div>
-
-          {/* Right Controls: Ground Mount, Wall Mount, Explode Layers */}
-          <div className="camera-hud-group">
-            {/* Ground Mount */}
-            <button
-              type="button"
-              className={`camera-hud-btn ${placementMode === 'floor' ? 'active-mode' : ''}`}
-              onClick={() => handleTogglePlacement('floor')}
-              title="Mount 3D Dish on Dining Table or Ground"
-            >
-              <Grid size={15} />
-              <span>🪑 Ground</span>
             </button>
 
-            {/* Wall Mount */}
             <button
               type="button"
-              className={`camera-hud-btn ${placementMode === 'wall' ? 'active-mode' : ''}`}
-              onClick={() => handleTogglePlacement('wall')}
-              title="Mount 3D Dish on Vertical Wall or Menu Board"
-            >
-              <Square size={15} />
-              <span>🧱 Wall</span>
-            </button>
-
-            {/* Explode Layers */}
-            <button
-              type="button"
-              className={`camera-hud-btn ${isLayerMode ? 'active-layer-btn' : ''}`}
+              className={`camera-hud-btn hud-explode-btn ${isLayerMode ? 'active-layer-btn' : ''}`}
               onClick={handleToggleLayerMode}
-              title="Deconstruct into 3D ingredient layers"
+              title={isLayerMode ? "Collapse 3D Layers" : "Deconstruct into 3D ingredient layers"}
             >
-              <Layers size={15} />
-              <span>{isLayerMode ? 'Collapse' : '✨ Explode'}</span>
+              <Layers size={14} />
+              <span>{isLayerMode ? 'Collapse' : 'Explode'}</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* 4. 3D Augmented Reality Model (Transparent canvas over live camera) */}
+      {/* 3. 3D Augmented Reality Model (Transparent canvas over live camera) */}
       <model-viewer
         ref={modelViewerRef}
         src={activeModelUrl}
@@ -343,7 +353,7 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
         touch-action="pan-y"
         loading="eager"
         reveal="auto"
-        camera-orbit={placementMode === 'wall' ? '0deg 90deg 100%' : '0deg 70deg 105%'}
+        camera-orbit={placementMode === 'wall' ? '0deg 90deg 110%' : '0deg 75deg 120%'}
         min-camera-orbit="auto auto 40%"
         max-camera-orbit="auto auto 300%"
         shadow-intensity={isCameraActive ? '1.8' : '1.3'}
@@ -371,7 +381,7 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
           </div>
         </div>
 
-        {/* Slotted AR button to prevent model-viewer default button from bypassing camera release */}
+        {/* Slotted AR button */}
         <button
           slot="ar-button"
           id="custom-model-viewer-ar-btn"
@@ -380,7 +390,7 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
           aria-hidden="true"
         />
 
-        {/* 3D Interactive Hotspots (Rendered in true 3D space when Layer Mode is active) */}
+        {/* 3D Interactive Hotspots */}
         {isLayerMode && layers.map((layer) => (
           <button
             key={layer.id}
@@ -406,70 +416,123 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
         ))}
       </model-viewer>
 
-      {/* Floating Status & Instruction Pill */}
-      <div className="ar-instruction-pill">
-        {cameraLoading ? (
-          <Loader2 size={16} className="spin" style={{ color: 'var(--accent-gold)' }} />
-        ) : (
-          <Sparkles size={16} style={{ color: 'var(--accent-gold)' }} />
-        )}
-        <span>{instruction}</span>
-      </div>
+      {/* Floating Status & Instruction Pill (Hidden when Layer Mode is open on mobile to avoid overlap) */}
+      {!isLayerMode && (
+        <div className="ar-instruction-pill">
+          {cameraLoading ? (
+            <Loader2 size={16} className="spin" style={{ color: 'var(--accent-gold)' }} />
+          ) : (
+            <Sparkles size={16} style={{ color: 'var(--accent-gold)' }} />
+          )}
+          <span>{instruction}</span>
+        </div>
+      )}
 
-      {/* Interactive Layer Inspector Drawer (Shown in Layer Mode) */}
+      {/* 4. Responsive Culinary Layer Inspector Bottom Drawer */}
       {isLayerMode && (
         <div className="layer-inspector-drawer">
+          {/* Mobile Drag Handle Bar */}
+          <div
+            className="layer-drawer-handle"
+            onClick={handleCollapseLayers}
+            title="Tap to collapse layers"
+          >
+            <div className="layer-drawer-pill" />
+          </div>
+
+          {/* Drawer Header */}
           <div className="layer-drawer-header">
-            <div>
+            <div className="layer-header-title-box">
               <span className="layer-badge-sm">
                 <Layers size={12} />
-                Culinary Layer Schematic
+                Culinary Deconstruction
               </span>
-              <h4 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#f8fafc', marginTop: '2px' }}>
-                {dish.name} Deconstruction
-              </h4>
+              <h4 className="layer-dish-heading">{dish.name}</h4>
             </div>
-            <button className="layer-close-btn" onClick={() => setIsLayerMode(false)}>
-              Collapse
+            <button
+              type="button"
+              className="layer-collapse-btn"
+              onClick={handleCollapseLayers}
+              title="Collapse into single dish"
+            >
+              <ChevronDown size={14} />
+              <span>Collapse</span>
             </button>
           </div>
 
-          {/* 3 Layer Cards Stack */}
-          <div className="layer-cards-grid">
+          {/* Segmented Layer Selector Tabs */}
+          <div className="layer-selector-tabs" role="tablist">
             {layers.map((layer) => {
               const isSelected = activeLayerIndex === layer.index;
               return (
-                <div
+                <button
                   key={layer.id}
-                  className={`layer-card-item ${isSelected ? 'selected' : ''}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSelected}
+                  className={`layer-tab-chip ${isSelected ? 'active' : ''}`}
+                  style={{
+                    '--tab-color': layer.color,
+                    borderColor: isSelected ? layer.color : 'rgba(255, 255, 255, 0.12)'
+                  }}
                   onClick={() => handleSelectLayer(layer.index)}
-                  style={{ borderLeftColor: layer.color }}
                 >
-                  <div className="layer-card-top">
-                    <span className="layer-tier-pill" style={{ color: layer.color }}>
-                      {layer.tier}
-                    </span>
-                    {isSelected && <Check size={14} style={{ color: layer.color }} />}
-                  </div>
-
-                  <h5 className="layer-card-title">{layer.name}</h5>
-                  <p className="layer-card-desc">{layer.description}</p>
-
-                  <div className="layer-ingredients-pills">
-                    {layer.ingredients.map((ing, i) => (
-                      <span key={i} className="layer-ing-chip">
-                        {ing}
-                      </span>
-                    ))}
-                  </div>
-                </div>
+                  <span className="tab-tier-dot" style={{ backgroundColor: layer.color }} />
+                  <span className="tab-tier-label">{layer.tier.split(':')[0]}</span>
+                </button>
               );
             })}
+          </div>
+
+          {/* Focused Active Layer Card (Concise, zero unnecessary height) */}
+          <div
+            className="active-layer-focused-card"
+            style={{ borderLeftColor: activeLayer.color }}
+          >
+            <div className="focused-card-top">
+              <span className="focused-tier-badge" style={{ color: activeLayer.color }}>
+                {activeLayer.tier}
+              </span>
+              <div className="layer-stepper">
+                <button
+                  type="button"
+                  className="stepper-arrow-btn"
+                  disabled={activeLayer.index === 0}
+                  onClick={() => handleSelectLayer(Math.max(0, activeLayer.index - 1))}
+                  title="Previous Tier"
+                >
+                  <ChevronUp size={13} style={{ transform: 'rotate(-90deg)' }} />
+                </button>
+                <span className="stepper-count">
+                  {activeLayer.index + 1} of {layers.length}
+                </span>
+                <button
+                  type="button"
+                  className="stepper-arrow-btn"
+                  disabled={activeLayer.index === layers.length - 1}
+                  onClick={() => handleSelectLayer(Math.min(layers.length - 1, activeLayer.index + 1))}
+                  title="Next Tier"
+                >
+                  <ChevronDown size={13} style={{ transform: 'rotate(-90deg)' }} />
+                </button>
+              </div>
+            </div>
+
+            <h5 className="focused-layer-title">{activeLayer.name}</h5>
+            <p className="focused-layer-desc">{activeLayer.description}</p>
+
+            <div className="focused-ingredients-wrap">
+              {activeLayer.ingredients.map((ing, i) => (
+                <span key={i} className="focused-ing-pill">
+                  • {ing}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Bottom AR Controls */}
+      {/* 5. Bottom AR Controls (Visible in Normal View) */}
       {!isLayerMode && (
         <div className="ar-bottom-controls">
           {/* Camera toggle: Live camera vs 3D Studio */}
@@ -523,4 +586,6 @@ export default function ARView({ dish, onBack, onOpenDetails, autoLaunch = false
       )}
     </div>
   );
-}
+});
+
+export default ARView;

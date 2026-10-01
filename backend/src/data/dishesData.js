@@ -54,6 +54,32 @@ export const DISHES_DATA = [
     colorAccent: '#ec4899'
   },
   {
+    id: 'celebration-cake',
+    name: 'Celebration Birthday Cake',
+    tagline: 'Personalized Belgian Chocolate Drip Cake',
+    price: '₹450',
+    numericPrice: 450,
+    spiceLevel: '🎂 Celebration Dessert',
+    spiceScore: 0,
+    rating: '5.0 ★ (Special Edition)',
+    prepTime: '15 mins',
+    calories: '420 kcal',
+    description: 'Decadent multi-layered Belgian chocolate sponge crowned with glossy dark chocolate ganache drip, chocolate shavings, celebratory toppings, and a personalized celebration plaque.',
+    ingredients: [
+      'Belgian Dark Chocolate Ganache',
+      'Moist Dutch-Processed Cocoa Sponge',
+      'Madagascar Vanilla Chantilly Frosting',
+      'Crispy Chocolate Curls & Chocochips',
+      'Artisanal Sugar Plaque Keepsake'
+    ],
+    dietary: 'Vegetarian',
+    badge: 'SPECIAL CELEBRATION',
+    isARAvailable: true,
+    modelUrl: '/models/celebration-cake.glb',
+    remoteModelUrl: `${GITHUB_MODELS_CDN}/celebration-cake.glb`,
+    colorAccent: '#a855f7'
+  },
+  {
     id: 'butter-chicken',
     name: 'Butter Chicken Handi',
     tagline: 'Murgh Makhani Royal Classic',
@@ -128,6 +154,32 @@ export const DISHES_DATA = [
     modelUrl: '/models/lime-soda.glb',
     remoteModelUrl: `${GITHUB_MODELS_CDN}/lime-soda.glb`,
     colorAccent: '#06b6d4'
+  },
+  {
+    id: 'cold-brew-flask',
+    name: 'Artisanal Cold Brew Flask',
+    tagline: '18-Hour Slow-Steeped Arabica Reserve',
+    price: '₹180',
+    numericPrice: 180,
+    spiceLevel: '🧊 Chilled Brew',
+    spiceScore: 0,
+    rating: '4.9 ★ (450+)',
+    prepTime: '5 mins',
+    calories: '15 kcal',
+    description: 'Single-origin estate Arabica coffee slow-steeped in alkaline water for 18 hours with hints of roasted chicory and wild vanilla pod, served in an insulated matte thermal flask with sustainable bamboo lid.',
+    ingredients: [
+      'Estate-Grown Single-Origin Arabica',
+      '18-Hour Cold Water Extraction',
+      'Wild Madagascar Vanilla Pod',
+      'Roasted French Chicory Essence',
+      'Mineral Alkaline Spring Water'
+    ],
+    dietary: 'Vegetarian',
+    badge: "CHEF'S RESERVE",
+    isARAvailable: true,
+    modelUrl: '/models/cold-brew-flask.glb',
+    remoteModelUrl: `${GITHUB_MODELS_CDN}/cold-brew-flask.glb`,
+    colorAccent: '#0ea5e9'
   },
   {
     id: 'masala-dosa',

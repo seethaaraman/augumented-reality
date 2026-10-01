@@ -9,10 +9,15 @@ const MODEL_FILE_MAP = {
   'biryani': 'biryani.glb',
   'artisan-cake': 'cake.glb',
   'cake': 'cake.glb',
+  'celebration-cake': 'celebration-cake.glb',
+  'birthday-cake': 'celebration-cake.glb',
   'butter-chicken': 'butter-chicken.glb',
   'paneer-tikka': 'paneer-tikka.glb',
   'fresh-lime-soda': 'lime-soda.glb',
-  'lime-soda': 'lime-soda.glb'
+  'lime-soda': 'lime-soda.glb',
+  'cold-brew-flask': 'cold-brew-flask.glb',
+  'beverage-flask': 'cold-brew-flask.glb',
+  'artisanal-flask': 'cold-brew-flask.glb'
 };
 
 /**
