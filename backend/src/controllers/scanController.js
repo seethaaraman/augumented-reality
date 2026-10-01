@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Dish from '../models/Dish.js';
-import { uploadGlbModel } from '../services/cloudinaryService.js';
+import cloudinary, { uploadGlbModel } from '../services/cloudinaryService.js';
 import { generate3DFromImage } from '../services/aiScannerService.js';
 import { extractFrameFromVideo } from '../services/videoProcessorService.js';
 
@@ -214,6 +214,13 @@ export function getUploadSignature(req, res) {
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+
+    if (!apiSecret || !apiKey || !cloudName) {
+      return res.status(500).json({
+        success: false,
+        error: 'Cloudinary environment variables (CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_CLOUD_NAME) are not configured in Vercel settings.'
+      });
+    }
 
     const signature = cloudinary.utils.api_sign_request(
       { timestamp, folder: 'ar_dish_models' },

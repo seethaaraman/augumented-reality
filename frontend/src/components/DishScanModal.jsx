@@ -2,6 +2,48 @@ import React, { useState, useRef } from 'react';
 import { X, Upload, Camera, Video, Sparkles, Check, AlertCircle, Loader2, Box, Eye, Flame } from 'lucide-react';
 import { getApiBase } from '../services/api';
 
+async function compressImageIfNeeded(file) {
+  if (!file || !file.type.startsWith('image/')) return file;
+  if (file.size < 1024 * 1024) return file;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const canvas = document.createElement('canvas');
+      const maxDim = 1200;
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) => {
+          if (blob && blob.size < file.size) {
+            resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+          } else {
+            resolve(file);
+          }
+        },
+        'image/jpeg',
+        0.85
+      );
+    };
+    img.onerror = () => resolve(file);
+    img.src = url;
+  });
+}
+
 export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
   const [mode, setMode] = useState('photo'); // 'photo' | 'video' | 'glb'
   const [file, setFile] = useState(null);
@@ -59,106 +101,113 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
 
     try {
       setStatus('uploading');
+      let uploadFile = file;
+
+      if (mode === 'photo') {
+        setProgressMsg('Optimizing image for 3D AI generator...');
+        uploadFile = await compressImageIfNeeded(file);
+      }
+
       if (mode === 'video') {
         setProgressMsg('Uploading 360° video to backend...');
       } else if (mode === 'photo') {
         setProgressMsg('Uploading photo to 3D AI generator...');
       } else {
-        setProgressMsg('Uploading 3D model to Cloudinary CDN...');
-      }
-
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('name', name);
-      formData.append('tagline', tagline || `${name} Special`);
-      formData.append('price', price);
-      formData.append('dietary', dietary);
-      formData.append('spiceLevel', spiceLevel);
-      formData.append('calories', calories);
-      formData.append('prepTime', prepTime);
-      formData.append('description', description || `Freshly scanned 3D delicacy served in immersive Augmented Reality.`);
-
-      if (mode === 'video') {
-        setTimeout(() => {
-          setProgressMsg('FFmpeg extracting 360° keyframe angles from video...');
-        }, 2000);
-        setTimeout(() => {
-          setProgressMsg('AI synthesizing 3D geometry & PBR textures (may take ~30s)...');
-        }, 5000);
-      } else if (mode === 'photo') {
-        setTimeout(() => {
-          setProgressMsg('AI synthesizing 3D geometry & PBR textures (may take ~30s)...');
-        }, 3000);
+        setProgressMsg('Requesting Cloudinary upload signature...');
       }
 
       let createdDish = null;
 
       // 1. Direct Cloudinary upload for .glb models (bypasses Vercel 4.5MB serverless payload limit)
       if (mode === 'glb') {
-        setProgressMsg('Uploading 3D model directly to Cloudinary CDN...');
-        try {
-          const sigRes = await fetch(`${getApiBase()}/scan/signature`);
-          if (sigRes.ok) {
-            const sigJson = await sigRes.json();
-            if (sigJson.success && sigJson.data) {
-              const sig = sigJson.data;
-              const cloudForm = new FormData();
-              cloudForm.append('file', file);
-              cloudForm.append('api_key', sig.apiKey);
-              cloudForm.append('timestamp', sig.timestamp);
-              cloudForm.append('signature', sig.signature);
-              cloudForm.append('folder', sig.folder);
+        setProgressMsg('Getting upload signature from backend...');
+        const sigRes = await fetch(`${getApiBase()}/scan/signature`);
+        const sigJson = await sigRes.json().catch(() => ({}));
 
-              const cloudUploadRes = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/raw/upload`, {
-                method: 'POST',
-                body: cloudForm
-              });
-
-              if (cloudUploadRes.ok) {
-                const cloudData = await cloudUploadRes.json();
-                if (cloudData.secure_url) {
-                  setProgressMsg('Registering dish in MongoDB Atlas...');
-                  const saveRes = await fetch(`${getApiBase()}/scan/save`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      name,
-                      tagline: tagline || `${name} Special`,
-                      price,
-                      dietary,
-                      spiceLevel,
-                      calories,
-                      prepTime,
-                      description: description || 'Freshly scanned 3D delicacy served in immersive Augmented Reality.',
-                      modelUrl: cloudData.secure_url
-                    })
-                  });
-
-                  if (saveRes.ok) {
-                    const saveJson = await saveRes.json();
-                    if (saveJson.success && saveJson.data) {
-                      createdDish = saveJson.data;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        } catch (directErr) {
-          console.warn('[DishScanModal] Direct Cloudinary upload fallback to standard upload:', directErr.message);
+        if (!sigRes.ok || !sigJson.success || !sigJson.data) {
+          throw new Error(sigJson.error || 'Could not get Cloudinary signature. Please verify Vercel environment variables.');
         }
-      }
 
-      // 2. Standard server-side upload fallback if direct upload didn't run or wasn't glb
-      if (!createdDish) {
+        const sig = sigJson.data;
+        const cloudForm = new FormData();
+        cloudForm.append('file', uploadFile);
+        cloudForm.append('api_key', sig.apiKey);
+        cloudForm.append('timestamp', sig.timestamp);
+        cloudForm.append('signature', sig.signature);
+        cloudForm.append('folder', sig.folder);
+
+        setProgressMsg('Uploading 3D model directly to Cloudinary CDN...');
+        const cloudUploadRes = await fetch(`https://api.cloudinary.com/v1_1/${sig.cloudName}/raw/upload`, {
+          method: 'POST',
+          body: cloudForm
+        });
+
+        if (!cloudUploadRes.ok) {
+          const cloudErr = await cloudUploadRes.json().catch(() => ({}));
+          throw new Error(cloudErr.error?.message || 'Direct upload to Cloudinary failed.');
+        }
+
+        const cloudData = await cloudUploadRes.json();
+        if (!cloudData.secure_url) {
+          throw new Error('Cloudinary did not return a valid 3D model URL.');
+        }
+
+        setProgressMsg('Saving dish in MongoDB Atlas...');
+        const saveRes = await fetch(`${getApiBase()}/scan/save`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            tagline: tagline || `${name} Special`,
+            price,
+            dietary,
+            spiceLevel,
+            calories,
+            prepTime,
+            description: description || 'Freshly scanned 3D delicacy served in immersive Augmented Reality.',
+            modelUrl: cloudData.secure_url
+          })
+        });
+
+        const saveJson = await saveRes.json().catch(() => ({}));
+        if (!saveRes.ok || !saveJson.success) {
+          throw new Error(saveJson.error || saveJson.message || 'Failed to save dish in MongoDB Atlas.');
+        }
+        createdDish = saveJson.data;
+      } else {
+        // Standard server-side AI reconstruction for photo and video
+        const formData = new FormData();
+        formData.append('file', uploadFile);
+        formData.append('name', name);
+        formData.append('tagline', tagline || `${name} Special`);
+        formData.append('price', price);
+        formData.append('dietary', dietary);
+        formData.append('spiceLevel', spiceLevel);
+        formData.append('calories', calories);
+        formData.append('prepTime', prepTime);
+        formData.append('description', description || 'Freshly scanned 3D delicacy served in immersive Augmented Reality.');
+
+        if (mode === 'video') {
+          setTimeout(() => {
+            setProgressMsg('FFmpeg extracting 360° keyframe angles from video...');
+          }, 2000);
+          setTimeout(() => {
+            setProgressMsg('AI synthesizing 3D geometry & PBR textures (may take ~30s)...');
+          }, 5000);
+        } else if (mode === 'photo') {
+          setTimeout(() => {
+            setProgressMsg('AI synthesizing 3D geometry & PBR textures (may take ~30s)...');
+          }, 3000);
+        }
+
         const res = await fetch(`${getApiBase()}/scan/dish`, {
           method: 'POST',
           body: formData
         });
 
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) {
-          throw new Error(data.message || 'Failed to process dish scan.');
+          throw new Error(data.message || data.error || 'Failed to process dish scan.');
         }
         createdDish = data.data;
       }
@@ -173,7 +222,10 @@ export default function DishScanModal({ isOpen, onClose, onDishAdded }) {
     } catch (err) {
       console.error('[DishScanModal] Error:', err);
       setStatus('error');
-      setErrorMsg(err.message || 'Something went wrong while processing the scan.');
+      const friendlyMsg = err.message === 'Failed to fetch'
+        ? 'Network request failed ("Failed to fetch"). Please check internet connection and ensure Vercel environment variables are configured.'
+        : err.message || 'Something went wrong while processing the scan.';
+      setErrorMsg(friendlyMsg);
     }
   };
 
